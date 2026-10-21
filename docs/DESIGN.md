@@ -109,6 +109,77 @@ between the user and our server. We assume it can:
 
 ---
 
+## 2A. Deployment topology (panel + nodes + tunnel nodes)
+
+Rahro is operated as a **control plane (the panel) + a fleet of nodes**, in the
+style of Marzban/Marzneshin, with an Iran-specific twist: some nodes are
+in-country relays that reach the outside world over the DPI-resistant Rahro
+tunnel. One panel manages users, inbounds, nodes, and tunnels together.
+
+```
+          ┌──────────── MAIN PANEL (foreign VPS: DE / NL / …) ─────────────┐
+          │  control plane: DB · admin UI · API · subscription service      │
+          │  may also act as a local egress node                            │
+          └───┬───────────────────────────────────────────────┬────────────┘
+      mTLS control channel (enroll token + CA)                 │
+          │                                                     │
+   ┌──────▼─────── LOCATION NODES (foreign egress) ───────┐     │
+   │  NL-node        TR-node        DE-node   …            │     │
+   │  terminate user inbounds, egress to the Internet,     │     │
+   │  provide multi-location subscription endpoints        │     │
+   └───────────────────────────────────────────────────────┘     │
+                                                                  │ Rahro tunnel
+                                        ┌─────────────────────────▼───────────┐
+                                        │  TUNNEL NODE (Iran relay)            │
+   user in Iran ──► domestic IP ───────►│  presents user-facing inbounds       │
+   (low latency, not blocked)           │  (standard VLESS/Trojan/REALITY AND/ │
+                                        │   or Rahro-native), then relays all   │
+                                        │  traffic out over the Rahro tunnel.   │
+                                        │  DPI on the border sees only benign   │
+                                        │  HTTPS to the foreign node.           │
+                                        └───────────────────────────────────────┘
+```
+
+### Node roles
+- **Main panel** — the single control plane and source of truth (users,
+  inbounds, nodes, quotas, subscription). Can also serve as an egress node.
+- **Location node** (foreign egress) — enrolled foreign server that terminates
+  user inbounds and egresses to the Internet. Purpose: **multi-location
+  subscriptions**.
+- **Tunnel node** (Iran relay) — enrolled in-country server. It presents
+  user-facing inbounds on a domestic IP and relays everything to a foreign
+  node/panel over the **Rahro tunnel** (client side of M1–M3). Purpose: low
+  latency + domestic IP for users, while the only border-crossing traffic is the
+  obfuscated Rahro flow.
+
+### Tunnel-node serving modes (decided with the user)
+A tunnel node can serve users in either or both modes, chosen per node/inbound
+by the admin:
+- **Standard inbounds** — VLESS / Trojan / REALITY / Shadowsocks, so existing
+  clients (v2rayNG, etc.) work unchanged; the node relays their traffic out over
+  Rahro.
+- **Rahro-native** — the dedicated Rahro protocol end-to-end (highest DPI
+  resistance; requires a Rahro client).
+
+### Node enrollment (connection code)
+1. Admin adds a node in the panel and gets a **one-time connection code**
+   (opaque token encoding: panel address + enrollment token + CA fingerprint).
+2. Operator runs the node installer on the server and pastes the code
+   (`rahro-node enroll <code>`).
+3. The node generates a keypair, registers to the panel over mTLS, and the panel
+   issues it a client certificate. The admin assigns its **role** (location /
+   tunnel), **location label**, and pushes inbound/tunnel config.
+4. Control stays on an **mTLS channel** (gRPC/HTTPS), separate from the user data
+   path. Config changes in the panel propagate to nodes live.
+
+### Subscription (decided with the user)
+**One subscription link per user, listing all enabled locations** (Marzban-style).
+The panel's subscription service aggregates every enabled node/location into the
+user's config list (per client format: v2ray/clash/sing-box/Rahro). The user
+picks a location in their client; quotas and expiry are enforced centrally.
+
+---
+
 ## 3. The Rahro protocol (the "dedicated method")
 
 The core idea borrows the proven ideas from REALITY + VLESS + modern AEAD and
@@ -278,9 +349,14 @@ Each milestone is small, compiles, and ships with tests before we move on.
 | **M4** | `client` SOCKS5 inbound + `server` egress, end-to-end over loopback | `curl --socks5 ... https://example.invalid-local` flows through tunnel in a local 2-process test |
 | **M5** | Padding + timing shaping; uTLS browser fingerprint; additional transports (ws, grpc, quic) | Tests assert ClientHello matches a target JA3; length distribution tests; each transport passes the M4 e2e test |
 | **M6** | Web panel (users, quotas, configs, metrics) + 3x-ui/Pasargard exporters | Panel CRUD + auth tests; exporter golden-file tests; manual smoke of the UI |
-| **M7** | Hardening: load test, memory/leak checks, docs, deployment (systemd + container), ops runbook | Soak test stable; `docs/DEPLOY.md` + `docs/SECURITY.md` complete |
+| **M8** | Node control plane: `rahro-node` binary, enrollment (connection code + mTLS), panel node registry, live config push to location nodes | Enroll a node over mTLS in a local 2-process test; panel pushes an inbound and the node serves it |
+| **M9** | Tunnel node (Iran relay) + multi-location subscription: relay user inbounds over the Rahro tunnel to a foreign node; aggregate all enabled locations into one subscription link | e2e: client → tunnel node (Iran) → Rahro tunnel → location node → Internet; one sub link lists all locations |
+| **M7** | Hardening: load test, memory/leak checks, docs, deployment (systemd + container + Windows service), ops runbook | Soak test stable; `docs/DEPLOY.md` + `docs/SECURITY.md` complete |
 
-We are at **M0 next**.
+**Progress:** M0, M1, M2 complete and tested (crypto + mux race-clean). **M3 is
+next** (TLS transport + REALITY fallback), which is also the foundation the
+tunnel nodes (M9) ride on. The node/topology work (M8–M9) was added after the
+user expanded scope to a multi-node, Iran-relay architecture.
 
 ---
 
@@ -341,6 +417,12 @@ rahro/
    reachable via IP+self-signed TLS, IP over HTTP, or domain+Let's Encrypt, on a
    configurable port — with a **one-line install script** (bash on Linux,
    PowerShell/Service on Windows) in the style of the Smite / 3x-ui panels.
+4. **Topology**: multi-node, Marzban-style — main panel (foreign) + location
+   nodes (foreign egress) + tunnel nodes (Iran relays over the Rahro tunnel),
+   all managed from one panel. See §2A.
+5. **Tunnel-node serving**: supports **both** standard inbounds and Rahro-native,
+   admin-selectable per node/inbound. **Subscription**: one link per user listing
+   all enabled locations.
 
 ### Reference: the user's Smite panel (for style/UX parity)
 `awmiresgg/smite` is the user's existing tunnel panel: FastAPI + React/TS +
