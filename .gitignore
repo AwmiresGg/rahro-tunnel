@@ -16,3 +16,9 @@ rahro-client.json
 .DS_Store
 .idea/
 .vscode/
+
+# Built binaries
+/rahro-panel
+/rahro-node
+/rahro-server
+/rahro-client
