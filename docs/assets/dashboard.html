@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  *{box-sizing:border-box} html,body{margin:0}
+  body{width:1280px;height:840px;display:flex;background:#0b1220;color:#e6edf6;font-family:Inter,system-ui,sans-serif;overflow:hidden}
+  aside{width:242px;flex-shrink:0;background:#0f172a;border-right:1px solid #1f2a40;padding:22px 16px;display:flex;flex-direction:column;gap:22px}
+  .logo{display:flex;align-items:center;gap:11px;padding:0 6px}
+  nav{display:flex;flex-direction:column;gap:3px;font-size:14px}
+  nav a{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;color:#9aa8c2;text-decoration:none}
+  nav a.on{background:#15223c;color:#e6edf6;font-weight:600}
+  .dot{width:7px;height:7px;border-radius:50%;background:#33415c}
+  .dot.a{background:#2dd4bf;box-shadow:0 0 8px #2dd4bf}
+  main{flex:1;display:flex;flex-direction:column;min-width:0}
+  header{height:62px;border-bottom:1px solid #1f2a40;display:flex;align-items:center;justify-content:space-between;padding:0 28px}
+  section{flex:1;padding:22px 28px;display:flex;flex-direction:column;gap:18px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .card{background:#141e32;border:1px solid #223354;border-radius:13px}
+  .stat{padding:15px 18px} .stat .n{font-size:26px;font-weight:700;margin-top:5px}
+  .av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2dd4bf,#60a5fa);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#07101f}
+</style></head>
+<body>
+  <aside>
+    <div class="logo">
+      <svg width="30" height="30" viewBox="0 0 32 32" fill="none"><rect x="1" y="1" width="30" height="30" rx="9" fill="#0b1220" stroke="#2dd4bf" stroke-width="1.5"/><path d="M8 20c3-9 13-9 16 0" stroke="#2dd4bf" stroke-width="2.2" stroke-linecap="round"/><circle cx="16" cy="13.5" r="2.6" fill="#60a5fa"/></svg>
+      <div><div style="font-size:16px;font-weight:700">Rahro</div><div style="font-size:10px;color:#6f7f9c;letter-spacing:1.5px;text-transform:uppercase">tunnel panel</div></div>
+    </div>
+    <nav>
+      <a class="on"><span class="dot a"></span> Dashboard</a>
+      <a><span class="dot"></span> Users</a>
+      <a><span class="dot"></span> Nodes</a>
+      <a><span class="dot"></span> Tunnel nodes</a>
+      <a><span class="dot"></span> Inbounds</a>
+      <a><span class="dot"></span> Settings</a>
+    </nav>
+    <div style="margin-top:auto;background:#13203a;border:1px solid #223354;border-radius:11px;padding:13px">
+      <div style="font-size:12px;color:#9aa8c2;margin-bottom:6px">Main panel</div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><span style="width:8px;height:8px;border-radius:50%;background:#34d399"></span> de-fra-01 · online</div>
+      <div style="font-size:11px;color:#6f7f9c;margin-top:5px">Germany · 23d uptime</div>
+    </div>
+  </aside>
+  <main>
+    <header><div style="font-size:18px;font-weight:600">Dashboard</div>
+      <div style="display:flex;align-items:center;gap:14px"><div style="font-size:12px;color:#8d9bb5;background:#111a2e;border:1px solid #1f2a40;padding:7px 12px;border-radius:8px">Last 24h ▾</div><div class="av">A</div></div></header>
+    <section>
+      <div class="grid">
+        <div class="card stat"><div style="font-size:12px;color:#8d9bb5">Active sessions</div><div class="n">1,284</div><div style="font-size:12px;color:#34d399;margin-top:3px">▲ 12% vs yesterday</div></div>
+        <div class="card stat"><div style="font-size:12px;color:#8d9bb5">Throughput</div><div class="n">342 <span style="font-size:14px;color:#8d9bb5">Mbps</span></div><div style="font-size:12px;color:#34d399;margin-top:3px">peak 511 Mbps</div></div>
+        <div class="card stat"><div style="font-size:12px;color:#8d9bb5">Users</div><div class="n">57 <span style="font-size:14px;color:#8d9bb5">/ 80</span></div><div style="font-size:12px;color:#8d9bb5;margin-top:3px">6 expiring this week</div></div>
+        <div class="card stat"><div style="font-size:12px;color:#8d9bb5">Nodes online</div><div class="n">6 <span style="font-size:14px;color:#8d9bb5">(3 relay)</span></div><div style="font-size:12px;color:#34d399;margin-top:3px">all tunnels healthy</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1.8fr 1fr;gap:16px;flex:1;min-height:0">
+        <div class="card" style="padding:18px;display:flex;flex-direction:column">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-size:14px;font-weight:600">Throughput (24h)</div><div style="font-size:11px;color:#8d9bb5">Mbps</div></div>
+          <svg viewBox="0 0 640 190" preserveAspectRatio="none" style="width:100%;flex:1"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2dd4bf" stop-opacity="0.35"/><stop offset="1" stop-color="#2dd4bf" stop-opacity="0"/></linearGradient></defs><line x1="0" y1="47" x2="640" y2="47" stroke="#1f2a40"/><line x1="0" y1="95" x2="640" y2="95" stroke="#1f2a40"/><line x1="0" y1="142" x2="640" y2="142" stroke="#1f2a40"/><path d="M0,150 L60,140 L120,112 L180,126 L240,84 L300,103 L360,56 L420,75 L480,38 L540,66 L600,51 L640,61 L640,190 L0,190 Z" fill="url(#g)"/><path d="M0,150 L60,140 L120,112 L180,126 L240,84 L300,103 L360,56 L420,75 L480,38 L540,66 L600,51 L640,61" fill="none" stroke="#2dd4bf" stroke-width="2.5"/></svg>
+        </div>
+        <div class="card" style="padding:18px;display:flex;flex-direction:column;gap:11px">
+          <div style="font-size:14px;font-weight:600">Locations &amp; tunnels</div>
+          <div style="display:flex;justify-content:space-between;font-size:13px"><span>🇩🇪 Germany <span style="color:#6f7f9c">· panel</span></span><span style="color:#34d399">● egress</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px"><span>🇳🇱 Netherlands</span><span style="color:#34d399">● egress</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px"><span>🇹🇷 Turkey</span><span style="color:#34d399">● egress</span></div>
+          <div style="border-top:1px solid #223354;padding-top:9px;font-size:11px;color:#6f7f9c;text-transform:uppercase;letter-spacing:.5px">Iran relays → Rahro tunnel</div>
+          <div style="display:flex;justify-content:space-between;font-size:13px"><span>🇮🇷 Tehran-1 → 🇩🇪</span><span style="color:#34d399">● 28 ms</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px"><span>🇮🇷 Shiraz-1 → 🇳🇱</span><span style="color:#34d399">● 41 ms</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px"><span>🇮🇷 Mashhad-1 → 🇹🇷</span><span style="color:#fbbf24">● reconnect</span></div>
+        </div>
+      </div>
+      <div class="card" style="padding:14px 18px;display:flex;align-items:center;gap:22px;font-size:13px">
+        <div style="color:#8d9bb5">REALITY decoy <span style="color:#cdd8ea">www.microsoft.com</span></div>
+        <div style="color:#8d9bb5">Active probes blocked <span style="color:#cdd8ea">1,042</span></div>
+        <div style="color:#8d9bb5">Tunnel traffic today <span style="color:#cdd8ea">1.9 TB</span></div>
+        <div style="margin-left:auto;color:#2dd4bf;font-weight:600">All systems operational</div>
+      </div>
+    </section>
+  </main>
+</body></html>
