@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # Rahro one-line installer (Linux).
 #
-#   Panel:        bash <(curl -sL https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh)
-#   Node:         bash <(curl -sL .../install.sh) node   <connection-code> -panel https://PANEL:2053
-#   Tunnel node:  bash <(curl -sL .../install.sh) tunnel <connection-code> -panel https://PANEL:2053
+# Most compatible (works on every terminal — download then run):
+#   curl -fsSL https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh -o rahro-install.sh
+#   sudo bash rahro-install.sh                 # panel
+#   sudo bash rahro-install.sh node   <code> -panel https://PANEL:2053 -insecure
+#   sudo bash rahro-install.sh tunnel <code> -panel https://PANEL:2053 -insecure
+#
+# Or pipe:  curl -fsSL .../install.sh | sudo bash
+# (Avoid `bash <(curl ...)` — some mobile/SSH terminals fail with /dev/fd/63.)
 #
 # It builds Rahro from source (installing Go if needed), installs the binaries
 # to /usr/local/bin, writes a config, and registers a systemd service.

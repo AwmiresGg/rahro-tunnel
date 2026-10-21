@@ -48,28 +48,19 @@
 
 ## ۱. نصب پنل (سرور خارج)
 
-یک خط، به‌عنوان root، روی Ubuntu/Debian/CentOS:
+به‌عنوان root روی Ubuntu/Debian/CentOS — اول دانلود، بعد اجرا (روی هر ترمینالی کار می‌کند):
 
 ```bash
-sudo bash <(curl -sL https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh)
+curl -fsSL https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh -o rahro-install.sh
+sudo bash rahro-install.sh
 ```
 
-> **ریپو خصوصی است؟** `rahro-tunnel` خصوصی است، پس لینک یک‌خطی بالا فقط وقتی کار
-> می‌کند که ریپو عمومی باشد (یا توکن بدهی). برای ریپوی خصوصی، با یک **Personal
-> Access Token** گیت‌هاب کلون کن و اسکریپت را از داخل همان پوشه اجرا کن — خودش
-> سورس محلی را تشخیص می‌دهد و از همان‌جا بیلد می‌کند (بدون دانلود دوباره):
+> یا با pipe: `curl -fsSL …/install.sh | sudo bash`.
+> از `bash <(curl …)` استفاده نکن — بعضی ترمینال‌های موبایل/SSH با خطای
+> `/dev/fd/63: No such file or directory` شکست می‌خورند.
 >
-> ```bash
-> apt-get update && apt-get install -y git curl
-> git clone https://github.com/AwmiresGg/rahro-tunnel.git   # نام کاربری + توکن (PAT) به‌جای رمز
-> cd rahro-tunnel
-> sudo bash scripts/install.sh                              # پنل
-> # نود:    sudo bash scripts/install.sh node   <code> -panel https://PANEL:2053 -insecure
-> # تانل:   sudo bash scripts/install.sh tunnel <code> -panel https://PANEL:2053 -insecure
-> ```
->
-> بعضی ترمینال‌های موبایل/SSH از `<(...)` پشتیبانی نمی‌کنند و خطای
-> `/dev/fd/63: No such file or directory` می‌دهند؛ روش کلون بالا این مشکل را ندارد.
+> بیلد از روی کلون هم کار می‌کند (و `scripts/install.sh` خودش کلون را تشخیص می‌دهد
+> و از همان‌جا بیلد می‌کند): `git clone https://github.com/AwmiresGg/rahro-tunnel.git && cd rahro-tunnel && sudo bash scripts/install.sh`.
 
 این اسکریپت Rahro را می‌سازد (اگر لازم باشد Go را نصب می‌کند)، فایل
 `/etc/rahro/panel.json` را می‌نویسد، یک ادمین می‌سازد، و سرویس systemd به نام
@@ -106,13 +97,13 @@ docker compose exec panel rahro-panel admin create -config /data/panel.json -u a
 node*). یک **کد اتصال** می‌گیری. روی آن سرور اجرا کن:
 
 ```bash
+I="https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh"
+
 # لوکیشن egress خارجی (به هر سابسکریپشن یک لوکیشن اضافه می‌کند):
-sudo bash <(curl -sL https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh) \
-  node <CONNECTION-CODE> -panel https://<panel-ip>:2053 -insecure
+curl -fsSL "$I" | sudo bash -s -- node <CONNECTION-CODE> -panel https://<panel-ip>:2053 -insecure
 
 # رله‌ی ایران (از تونل Rahro به پنل/upstream وصل می‌شود):
-sudo bash <(curl -sL .../install.sh) \
-  tunnel <CONNECTION-CODE> -panel https://<panel-ip>:2053 -insecure
+curl -fsSL "$I" | sudo bash -s -- tunnel <CONNECTION-CODE> -panel https://<panel-ip>:2053 -insecure
 ```
 
 `-insecure` وارسی گواهی TLS پنل را رد می‌کند (وقتی پنل گواهی self-signed / IP دارد

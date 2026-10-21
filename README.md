@@ -53,28 +53,19 @@ Full design: [docs/DESIGN.md](docs/DESIGN.md).
 
 ## 1. Install the panel (foreign server)
 
-One line, as root, on Ubuntu/Debian/CentOS:
+As root, on Ubuntu/Debian/CentOS — download then run (works on every terminal):
 
 ```bash
-sudo bash <(curl -sL https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh)
+curl -fsSL https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh -o rahro-install.sh
+sudo bash rahro-install.sh
 ```
 
-> **Private repo?** `rahro-tunnel` is private, so the raw one-liner above only
-> works once the repo is public (or you pass a token). For a private repo, clone
-> it with a GitHub **Personal Access Token** and run the script from the
-> checkout — it detects the local source and builds from it (no re-download):
+> Or pipe it: `curl -fsSL …/install.sh | sudo bash`.
+> Avoid `bash <(curl …)` — some mobile/SSH terminals fail it with
+> `/dev/fd/63: No such file or directory`.
 >
-> ```bash
-> apt-get update && apt-get install -y git curl
-> git clone https://github.com/AwmiresGg/rahro-tunnel.git   # username + PAT as the password
-> cd rahro-tunnel
-> sudo bash scripts/install.sh                              # panel
-> # node:    sudo bash scripts/install.sh node   <code> -panel https://PANEL:2053 -insecure
-> # tunnel:  sudo bash scripts/install.sh tunnel <code> -panel https://PANEL:2053 -insecure
-> ```
->
-> Some mobile/SSH terminals don't support `<(...)` and fail with
-> `/dev/fd/63: No such file or directory`; the clone method above avoids it.
+> Building from a clone works too (and `scripts/install.sh` detects the checkout
+> and builds from it): `git clone https://github.com/AwmiresGg/rahro-tunnel.git && cd rahro-tunnel && sudo bash scripts/install.sh`.
 
 It builds Rahro (installing Go if needed), writes `/etc/rahro/panel.json`,
 creates an admin, and starts the `rahro-panel` systemd service. At the end it
@@ -110,13 +101,13 @@ In the panel → **Nodes** → *Add location node* (or **Tunnel nodes** → *Add
 tunnel node*). You get a **connection code**. On that server, run:
 
 ```bash
+I="https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh"
+
 # Foreign egress location (adds a location to every subscription):
-sudo bash <(curl -sL https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh) \
-  node <CONNECTION-CODE> -panel https://<panel-ip>:2053 -insecure
+curl -fsSL "$I" | sudo bash -s -- node <CONNECTION-CODE> -panel https://<panel-ip>:2053 -insecure
 
 # Iran relay (tunnels to the panel/upstream over the Rahro tunnel):
-sudo bash <(curl -sL .../install.sh) \
-  tunnel <CONNECTION-CODE> -panel https://<panel-ip>:2053 -insecure
+curl -fsSL "$I" | sudo bash -s -- tunnel <CONNECTION-CODE> -panel https://<panel-ip>:2053 -insecure
 ```
 
 `-insecure` skips TLS verification of the panel (needed when the panel uses a
