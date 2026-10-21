@@ -12,7 +12,9 @@ LDFLAGS  := -s -w \
 
 export CGO_ENABLED := 0
 
-.PHONY: all build test vet fmt tidy clean build-linux build-windows
+BINS := rahro-panel rahro-node rahro-server rahro-client
+
+.PHONY: all build test race vet fmt tidy clean dist build-linux build-windows docker
 
 all: fmt vet test build
 
@@ -21,6 +23,9 @@ build:
 
 test:
 	go test ./...
+
+race:
+	CGO_ENABLED=1 go test -race ./...
 
 vet:
 	go vet ./...
@@ -31,12 +36,22 @@ fmt:
 tidy:
 	go mod tidy
 
-# Cross-compiled server binaries for the two supported server OSes.
+# Cross-compiled release binaries for both supported server OSes.
 build-linux:
-	GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/rahro-server-linux-amd64 ./cmd/rahro-server
+	@for b in $(BINS); do \
+	  GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/$$b-linux-amd64 ./cmd/$$b; \
+	  GOOS=linux GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/$$b-linux-arm64 ./cmd/$$b; \
+	done
 
 build-windows:
-	GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/rahro-server-windows-amd64.exe ./cmd/rahro-server
+	@for b in $(BINS); do \
+	  GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/$$b-windows-amd64.exe ./cmd/$$b; \
+	done
+
+dist: build-linux build-windows
+
+docker:
+	docker build -t rahro:$(VERSION) .
 
 clean:
 	rm -rf dist

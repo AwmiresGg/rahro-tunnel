@@ -185,7 +185,7 @@ func (s *Server) handleCreateNode(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]any{
 		"node":            created,
 		"connection_code": created.EnrollToken,
-		"enroll_command":  "bash <(curl -sL https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/main/scripts/install.sh) node " + created.EnrollToken,
+		"enroll_command":  "bash <(curl -sL https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh) node " + created.EnrollToken,
 	}
 	writeJSON(w, http.StatusCreated, resp)
 }

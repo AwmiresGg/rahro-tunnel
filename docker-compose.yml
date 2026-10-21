@@ -1,0 +1,17 @@
+# Rahro panel via Docker Compose.
+#   docker compose up -d --build
+#   docker compose exec panel rahro-panel admin create -config /data/panel.json -u admin -p 'yourpass'
+#
+# The panel stores its SQLite DB and config in the ./data volume.
+services:
+  panel:
+    build: .
+    image: rahro:latest
+    container_name: rahro-panel
+    restart: unless-stopped
+    network_mode: host          # so the panel sees real client IPs and can bind 2053/443
+    volumes:
+      - ./data:/data
+    # First run writes a default config if ./data/panel.json is absent; edit it
+    # then `docker compose restart panel`.
+    command: ["run", "-config", "/data/panel.json"]
