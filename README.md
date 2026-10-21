@@ -201,9 +201,35 @@ See [docs/DEPLOY.md](docs/DEPLOY.md) for production deployment and
 
 ## Status
 
-Implemented and tested: crypto core, protocol + multiplexer, TLS transport with
-REALITY-style probe fallback, uTLS fingerprinting, WebSocket transport, frame
-padding, SOCKS5/HTTP client inbounds, server egress, the panel (SQLite + API +
-SPA + CLI), the node control plane + enrollment, the Iran tunnel relay path, the
-subscription endpoint, and the Telegram bot API. All packages pass `go test` and
-the concurrency-sensitive ones pass the race detector.
+**Implemented and tested** (all packages pass `go test`; concurrency-sensitive
+ones pass `-race`):
+
+- Crypto core (X25519 / AEAD / HKDF / replay window / REALITY-style authenticator)
+- Rahro protocol + stream multiplexer with flow control
+- TLS transport with REALITY-style probe → decoy fallback, uTLS fingerprinting,
+  WebSocket transport, frame-length padding
+- Client inbounds (SOCKS5, HTTP/HTTPS proxy) + server egress, proven end-to-end
+- Panel: SQLite store, admin API, SPA, CLI, subscription endpoint
+- Node control plane + connection-code enrollment; Iran tunnel-relay data path
+  (user → tunnel node → Rahro tunnel → location egress → origin), proven e2e
+- Telegram bot API (token auth): create/renew users, usage, nodes
+
+**Roadmap / not yet implemented (honest limitations):**
+
+- **Stock-client standard inbounds (VLESS / Trojan / Shadowsocks).** Today a
+  tunnel node's user ingress is a **SOCKS5/HTTP proxy** relayed over the Rahro
+  tunnel, and the fully-native path is the Rahro protocol. Implementing the
+  VLESS/Trojan/SS wire protocols so unmodified v2rayNG/sing-box clients connect
+  directly is the next milestone; until then the `vless://` lines in a
+  subscription are placeholders for that integration, and the working user path
+  is the local SOCKS5/HTTP proxy (or a future Rahro client app).
+- **Full REALITY** (ClientHello key-share embedding + raw-TCP decoy forwarding
+  that preserves the decoy's real certificate) — see docs/SECURITY.md. Use
+  `tls_mode: domain` on user-facing nodes for a trusted cert in the meantime.
+- **gRPC / QUIC transports** — the transport layer is pluggable; TLS and
+  WebSocket ship now.
+- Client **GUI / mobile apps**.
+
+These are called out so nothing here is oversold: the tunnel, obfuscation,
+panel, nodes, enrollment, Iran relay path, and bot API are real and tested; the
+stock-client protocol front-ends are the remaining work.

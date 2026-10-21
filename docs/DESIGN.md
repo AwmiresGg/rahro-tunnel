@@ -353,10 +353,11 @@ Each milestone is small, compiles, and ships with tests before we move on.
 | **M9** | Tunnel node (Iran relay) + multi-location subscription: relay user inbounds over the Rahro tunnel to a foreign node; aggregate all enabled locations into one subscription link | e2e: client → tunnel node (Iran) → Rahro tunnel → location node → Internet; one sub link lists all locations |
 | **M7** | Hardening: load test, memory/leak checks, docs, deployment (systemd + container + Windows service), ops runbook | Soak test stable; `docs/DEPLOY.md` + `docs/SECURITY.md` complete |
 
-**Progress:** M0, M1, M2 complete and tested (crypto + mux race-clean). **M3 is
-next** (TLS transport + REALITY fallback), which is also the foundation the
-tunnel nodes (M9) ride on. The node/topology work (M8–M9) was added after the
-user expanded scope to a multi-node, Iran-relay architecture.
+**Progress:** M0–M9 plus the panel, node control plane, Iran tunnel relay, and
+Telegram bot API are implemented and tested (crypto, mux, transport, panel and
+e2e are race-clean). Remaining roadmap items (stock-client VLESS/Trojan/SS
+inbounds, full REALITY ClientHello embedding, gRPC/QUIC transports, GUI/mobile)
+are listed honestly in the README's Status section.
 
 ---
 
