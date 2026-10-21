@@ -35,6 +35,7 @@ func Run(st *store.Store, cfg *config.PanelConfig, log *slog.Logger) error {
 	root.Handle("/api/", apiMux)
 	root.Handle("/sub/", apiMux)
 	root.Handle("/botapi/", apiMux)
+	root.Handle("/nodeapi/", apiMux)
 	root.Handle("/", web.Handler())
 
 	httpSrv := &http.Server{

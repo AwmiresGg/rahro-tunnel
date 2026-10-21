@@ -71,6 +71,10 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("POST /api/tokens", s.admin(s.handleCreateToken))
 	mux.HandleFunc("DELETE /api/tokens/{id}", s.admin(s.handleDeleteToken))
 
+	// Node control plane (node-secret authenticated in-handler).
+	mux.HandleFunc("POST /nodeapi/enroll", s.handleNodeEnroll)
+	mux.HandleFunc("POST /nodeapi/config", s.handleNodeConfig)
+
 	// Public subscription.
 	mux.HandleFunc("GET /sub/{token}", s.handleSubscription)
 
