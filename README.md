@@ -1,5 +1,9 @@
 # Rahro — DPI-resistant tunnel + management panel
 
+<p align="center"><b>English</b> · <a href="README.fa.md">فارسی 🇮🇷</a></p>
+
+![Rahro panel — dashboard](docs/assets/dashboard.png)
+
 **Rahro** (رهرو, "wayfarer") is a censorship-circumvention tunnel with a web
 panel, built for networks that use Deep Packet Inspection (DPI) and active
 probing. It runs on **Linux and Windows servers**, manages **users, inbounds,
