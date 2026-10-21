@@ -10,8 +10,11 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"strings"
 	"sync"
 	"time"
+
+	utls "github.com/refraction-networking/utls"
 
 	"github.com/awmiresgg/rahro/core/crypto"
 )
@@ -40,6 +43,11 @@ type TLSClient struct {
 	HandshakeTimeout time.Duration
 	// Dialer is the underlying TCP dialer (default &net.Dialer{}).
 	Dialer *net.Dialer
+	// Fingerprint, when set, makes the client present a browser's TLS
+	// ClientHello via uTLS: "chrome" (default), "firefox", "safari", "edge",
+	// or "ios". Empty uses the Go standard library ClientHello. ("random" is
+	// also accepted but may not negotiate with a strict TLS 1.3-only server.)
+	Fingerprint string
 }
 
 // Dial connects, performs the TLS handshake, sends the authenticator, and
@@ -64,6 +72,51 @@ func (c *TLSClient) Dial(ctx context.Context) (net.Conn, error) {
 		return nil, fmt.Errorf("transport: dial: %w", err)
 	}
 
+	sec, err := c.secureHandshake(dctx, raw, timeout)
+	if err != nil {
+		raw.Close()
+		return nil, err
+	}
+
+	payload := crypto.AuthPayload{UserID: c.UserID, Time: time.Now()}
+	if _, err := rand.Read(payload.Nonce[:]); err != nil {
+		sec.Close()
+		return nil, fmt.Errorf("transport: nonce: %w", err)
+	}
+	msg, _, err := crypto.SealHandshake(c.ServerPub, authAD(c.ServerPub), payload)
+	if err != nil {
+		sec.Close()
+		return nil, fmt.Errorf("transport: seal handshake: %w", err)
+	}
+	if _, err := sec.Write(msg); err != nil {
+		sec.Close()
+		return nil, fmt.Errorf("transport: write handshake: %w", err)
+	}
+	// Clear the handshake deadline; the data phase manages its own timeouts.
+	_ = sec.SetDeadline(time.Time{})
+	return sec, nil
+}
+
+// secureHandshake performs the TLS 1.3 handshake, using uTLS to present a
+// browser ClientHello fingerprint when c.Fingerprint is set, otherwise the Go
+// standard library.
+func (c *TLSClient) secureHandshake(ctx context.Context, raw net.Conn, timeout time.Duration) (net.Conn, error) {
+	deadline := time.Now().Add(timeout)
+	if c.Fingerprint != "" {
+		ucfg := &utls.Config{ServerName: c.SNI, MinVersion: tls.VersionTLS12}
+		if c.PinnedRootCAs != nil {
+			ucfg.RootCAs = c.PinnedRootCAs
+		} else {
+			ucfg.InsecureSkipVerify = true
+		}
+		uconn := utls.UClient(raw, ucfg, fingerprintID(c.Fingerprint))
+		_ = uconn.SetDeadline(deadline)
+		if err := uconn.HandshakeContext(ctx); err != nil {
+			return nil, fmt.Errorf("transport: utls handshake: %w", err)
+		}
+		return uconn, nil
+	}
+
 	tlsCfg := &tls.Config{ServerName: c.SNI, MinVersion: tls.VersionTLS13}
 	if c.PinnedRootCAs != nil {
 		tlsCfg.RootCAs = c.PinnedRootCAs
@@ -71,29 +124,29 @@ func (c *TLSClient) Dial(ctx context.Context) (net.Conn, error) {
 		tlsCfg.InsecureSkipVerify = true // trust comes from the Rahro authenticator
 	}
 	tconn := tls.Client(raw, tlsCfg)
-	_ = tconn.SetDeadline(time.Now().Add(timeout))
-	if err := tconn.HandshakeContext(dctx); err != nil {
-		raw.Close()
+	_ = tconn.SetDeadline(deadline)
+	if err := tconn.HandshakeContext(ctx); err != nil {
 		return nil, fmt.Errorf("transport: tls handshake: %w", err)
 	}
-
-	payload := crypto.AuthPayload{UserID: c.UserID, Time: time.Now()}
-	if _, err := rand.Read(payload.Nonce[:]); err != nil {
-		tconn.Close()
-		return nil, fmt.Errorf("transport: nonce: %w", err)
-	}
-	msg, _, err := crypto.SealHandshake(c.ServerPub, authAD(c.ServerPub), payload)
-	if err != nil {
-		tconn.Close()
-		return nil, fmt.Errorf("transport: seal handshake: %w", err)
-	}
-	if _, err := tconn.Write(msg); err != nil {
-		tconn.Close()
-		return nil, fmt.Errorf("transport: write handshake: %w", err)
-	}
-	// Clear the handshake deadline; the data phase manages its own timeouts.
-	_ = tconn.SetDeadline(time.Time{})
 	return tconn, nil
+}
+
+// fingerprintID maps a friendly name to a uTLS ClientHello fingerprint.
+func fingerprintID(name string) utls.ClientHelloID {
+	switch strings.ToLower(name) {
+	case "firefox":
+		return utls.HelloFirefox_Auto
+	case "safari":
+		return utls.HelloSafari_Auto
+	case "edge":
+		return utls.HelloEdge_Auto
+	case "ios":
+		return utls.HelloIOS_Auto
+	case "random":
+		return utls.HelloRandomized
+	default: // "chrome" and anything unrecognized
+		return utls.HelloChrome_Auto
+	}
 }
 
 // --- server ---

@@ -134,6 +134,60 @@ func TestAuthenticatedClientEchoes(t *testing.T) {
 	}
 }
 
+func TestAuthenticatedClientUTLSFingerprint(t *testing.T) {
+	addr, key := testServer(t)
+	// Deterministic modern fingerprints that always negotiate TLS 1.3. The
+	// "random" fingerprint is intentionally excluded: HelloRandomized can emit
+	// a ClientHello incompatible with a strict TLS 1.3-only server.
+	for _, fp := range []string{"chrome", "firefox", "edge", "safari", "ios"} {
+		t.Run(fp, func(t *testing.T) {
+			var uid [16]byte
+			rand.Read(uid[:])
+			client := &TLSClient{
+				ServerAddr:  addr,
+				SNI:         "localhost",
+				ServerPub:   key.PublicKey(),
+				UserID:      uid,
+				Fingerprint: fp,
+			}
+			done := make(chan error, 1)
+			go func() {
+				conn, err := client.Dial(context.Background())
+				if err != nil {
+					done <- err
+					return
+				}
+				sess := proto.Client(conn, nil)
+				st, err := sess.OpenStream()
+				if err != nil {
+					done <- err
+					return
+				}
+				st.Write([]byte("utls-hello"))
+				st.Close()
+				got, err := io.ReadAll(st)
+				if err != nil {
+					done <- err
+					return
+				}
+				if string(got) != "utls-hello" {
+					done <- fmt.Errorf("echo mismatch: %q", got)
+					return
+				}
+				done <- nil
+			}()
+			select {
+			case err := <-done:
+				if err != nil {
+					t.Fatal(err)
+				}
+			case <-time.After(10 * time.Second):
+				t.Fatal("timed out")
+			}
+		})
+	}
+}
+
 // TestProbeGetsDecoy models a censor's active prober: a plain TLS client that
 // completes the handshake and sends an HTTP request. It must be transparently
 // served the real decoy site, learning nothing about Rahro.

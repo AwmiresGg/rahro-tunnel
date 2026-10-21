@@ -10,6 +10,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/awmiresgg/rahro/core/obfs"
 	"github.com/awmiresgg/rahro/core/proto"
 	"github.com/awmiresgg/rahro/core/relay"
 )
@@ -49,7 +50,7 @@ func (c *Client) session(ctx context.Context) (*proto.Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.sess = proto.Client(conn, nil)
+	c.sess = proto.Client(conn, &proto.Config{Padder: obfs.NewRandomPadder()})
 	c.log.Debug("opened new tunnel session")
 	return c.sess, nil
 }

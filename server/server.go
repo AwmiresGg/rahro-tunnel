@@ -8,6 +8,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/awmiresgg/rahro/core/obfs"
 	"github.com/awmiresgg/rahro/core/proto"
 	"github.com/awmiresgg/rahro/core/relay"
 	"github.com/awmiresgg/rahro/core/transport"
@@ -37,7 +38,7 @@ func (e *Egress) Serve(l *transport.Listener) error {
 }
 
 func (e *Egress) handleConn(ac *transport.AuthedConn) {
-	sess := proto.Server(ac, nil)
+	sess := proto.Server(ac, &proto.Config{Padder: obfs.NewRandomPadder()})
 	e.Log.Debug("tunnel session up", "user", shortID(ac.UserID))
 	for {
 		st, err := sess.AcceptStream()

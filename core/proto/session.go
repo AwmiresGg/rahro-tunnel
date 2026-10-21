@@ -18,6 +18,13 @@ const (
 	defaultAcceptBacklog = 256
 )
 
+// Padder decides how many padding bytes to append to a frame to shape the
+// length distribution seen by an on-path observer. It is implemented by
+// core/obfs; nil means no padding. It must be safe for concurrent use.
+type Padder interface {
+	PadLen(t FrameType, payloadLen int) uint16
+}
+
 // Config tunes a Session. Both peers must agree on InitialWindow (it defines
 // how much unacknowledged data a sender may have outstanding per stream); the
 // defaults match, so two Sessions created with nil/zero config interoperate.
@@ -25,6 +32,8 @@ type Config struct {
 	MaxFrameSize  int
 	InitialWindow int
 	AcceptBacklog int
+	// Padder, if set, appends length-shaping padding to outbound frames.
+	Padder Padder
 }
 
 func (c *Config) withDefaults() Config {
@@ -154,6 +163,9 @@ func (s *Session) writeFrame(f Frame) error {
 	case <-s.die:
 		return s.exitErr()
 	default:
+	}
+	if s.cfg.Padder != nil && f.PadLen == 0 {
+		f.PadLen = s.cfg.Padder.PadLen(f.Type, len(f.Payload))
 	}
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
