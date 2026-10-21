@@ -65,6 +65,10 @@ func NewAEAD(suite string, key []byte) (cipher.AEAD, error) {
 // 12-byte (96-bit) nonce.
 const NonceSize = chacha20poly1305.NonceSize
 
+// TagSize is the AEAD authentication tag size in bytes. Both ChaCha20-Poly1305
+// and AES-GCM append a 16-byte tag.
+const TagSize = 16
+
 // NonceSequence produces monotonically increasing deterministic nonces for a
 // single key/direction. It encodes a 64-bit big-endian counter in the low 8
 // bytes of a 12-byte nonce (the high 4 bytes stay zero). Reusing a (key, nonce)

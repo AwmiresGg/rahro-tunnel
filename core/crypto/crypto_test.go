@@ -208,6 +208,19 @@ func TestHandshakeRoundTrip(t *testing.T) {
 	}
 }
 
+func TestHandshakeMessageSizeIsConstant(t *testing.T) {
+	server, _ := GenerateKeyPair()
+	for i := 0; i < 50; i++ {
+		msg, _, err := SealHandshake(server.PublicKey(), []byte("ad"), randPayload(t))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(msg) != HandshakeMessageSize {
+			t.Fatalf("handshake size = %d, want constant %d", len(msg), HandshakeMessageSize)
+		}
+	}
+}
+
 func TestHandshakeWrongServerKeyFails(t *testing.T) {
 	server, _ := GenerateKeyPair()
 	attacker, _ := GenerateKeyPair()

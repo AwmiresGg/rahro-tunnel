@@ -25,6 +25,19 @@ const authNonceLen = 16
 //	version(1) + unixSeconds(8) + userID(16) + nonce(16)
 const authPayloadLen = 1 + 8 + UserIDLen + authNonceLen
 
+// ephemeralPubLen is the length of the X25519 public key prepended by
+// SealHandshake.
+const ephemeralPubLen = 32
+
+// HandshakeMessageSize is the exact byte length of a SealHandshake output under
+// the default suite. Because the authenticated payload is fixed-size, the whole
+// handshake message is a constant size, which lets the server read exactly this
+// many bytes before deciding whether a connection is a genuine Rahro client or
+// an unauthenticated probe to be sent to the decoy.
+//
+//	ephemeralPub(32) + nonce(12) + payload(41) + AEAD tag(16) = 101
+const HandshakeMessageSize = ephemeralPubLen + NonceSize + authPayloadLen + TagSize
+
 // AuthPayload is the authenticated plaintext a client proves to the server
 // during the handshake. It identifies the user and carries freshness material
 // (timestamp + nonce) consumed by a ReplayWindow.
@@ -141,15 +154,14 @@ func SealHandshake(serverPub *ecdh.PublicKey, associatedData []byte, payload Aut
 // OpenHandshake reverses SealHandshake: it splits the leading 32-byte ephemeral
 // public key, then authenticates the remainder.
 func OpenHandshake(serverPriv *KeyPair, associatedData, msg []byte) (AuthPayload, *ecdh.PublicKey, error) {
-	const pubLen = 32
-	if len(msg) < pubLen {
-		return AuthPayload{}, nil, fmt.Errorf("handshake too short (%d < %d)", len(msg), pubLen)
+	if len(msg) < ephemeralPubLen {
+		return AuthPayload{}, nil, fmt.Errorf("handshake too short (%d < %d)", len(msg), ephemeralPubLen)
 	}
-	ephemeralPub, err := PublicKeyFromBytes(msg[:pubLen])
+	ephemeralPub, err := PublicKeyFromBytes(msg[:ephemeralPubLen])
 	if err != nil {
 		return AuthPayload{}, nil, err
 	}
-	payload, err := OpenAuthenticator(serverPriv, ephemeralPub, associatedData, msg[pubLen:])
+	payload, err := OpenAuthenticator(serverPriv, ephemeralPub, associatedData, msg[ephemeralPubLen:])
 	if err != nil {
 		return AuthPayload{}, nil, err
 	}
