@@ -1,0 +1,18 @@
+# Build output
+/dist/
+*.exe
+*.test
+*.out
+
+# Go
+/vendor/
+
+# Local config / secrets (never commit real server keys)
+rahro.json
+rahro-client.json
+*.local.json
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
