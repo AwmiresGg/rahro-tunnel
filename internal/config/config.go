@@ -97,6 +97,12 @@ type PanelConfig struct {
 	// BasePath is an optional secret URL prefix (e.g. "/x7f3a") to reduce
 	// drive-by scanning of the panel.
 	BasePath string `json:"base_path,omitempty"`
+	// PublicURL is the externally-reachable panel base used to build user
+	// subscription links, e.g. "https://panel.example.com:2053". If empty it is
+	// derived from Domain/Listen/TLSMode.
+	PublicURL string `json:"public_url,omitempty"`
+	// DBPath is the SQLite database path (default "rahro-panel.db").
+	DBPath string `json:"db_path,omitempty"`
 }
 
 // Default returns a baseline config suitable for a fresh server+panel install.
