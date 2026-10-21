@@ -59,6 +59,23 @@ One line, as root, on Ubuntu/Debian/CentOS:
 sudo bash <(curl -sL https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh)
 ```
 
+> **Private repo?** `rahro-tunnel` is private, so the raw one-liner above only
+> works once the repo is public (or you pass a token). For a private repo, clone
+> it with a GitHub **Personal Access Token** and run the script from the
+> checkout — it detects the local source and builds from it (no re-download):
+>
+> ```bash
+> apt-get update && apt-get install -y git curl
+> git clone https://github.com/AwmiresGg/rahro-tunnel.git   # username + PAT as the password
+> cd rahro-tunnel
+> sudo bash scripts/install.sh                              # panel
+> # node:    sudo bash scripts/install.sh node   <code> -panel https://PANEL:2053 -insecure
+> # tunnel:  sudo bash scripts/install.sh tunnel <code> -panel https://PANEL:2053 -insecure
+> ```
+>
+> Some mobile/SSH terminals don't support `<(...)` and fail with
+> `/dev/fd/63: No such file or directory`; the clone method above avoids it.
+
 It builds Rahro (installing Go if needed), writes `/etc/rahro/panel.json`,
 creates an admin, and starts the `rahro-panel` systemd service. At the end it
 prints your **panel URL** and **admin credentials**.

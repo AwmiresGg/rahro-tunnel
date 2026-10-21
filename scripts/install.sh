@@ -40,12 +40,24 @@ ensure_go(){
 }
 
 fetch_src(){
+  # If we are already inside a Rahro checkout (e.g. you cloned a PRIVATE repo
+  # and ran this script from it), build from here — no network fetch needed.
+  if [ -f go.mod ] && grep -q 'module github.com/awmiresgg/rahro' go.mod 2>/dev/null; then
+    SRC="$PWD"; info "building from local checkout ($SRC)"; return
+  fi
   SRC="$(mktemp -d)"
   info "fetching source ($REPO@$REF)"
+  local url="$REPO"
+  # For a private repo, export RAHRO_TOKEN=<github PAT> before running.
+  if [ -n "${RAHRO_TOKEN:-}" ]; then
+    url="https://${RAHRO_TOKEN}@${REPO#https://}"
+  fi
   if command -v git >/dev/null 2>&1; then
-    git clone --depth 1 "$REPO" "$SRC" >/dev/null 2>&1 || die "git clone failed"
+    git clone --depth 1 "$url" "$SRC" >/dev/null 2>&1 \
+      || die "git clone failed. If the repo is private: clone it manually with a GitHub token and re-run 'sudo bash scripts/install.sh' from inside it, or set RAHRO_TOKEN=<token>."
   else
-    curl -fsSL "${REPO}/archive/${REF}.tar.gz" | tar -xz -C "$SRC" --strip-components=1 || die "tarball fetch failed"
+    curl -fsSL "${url}/archive/${REF}.tar.gz" | tar -xz -C "$SRC" --strip-components=1 \
+      || die "tarball fetch failed (private repo? see the README's private-repo install)"
   fi
 }
 

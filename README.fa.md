@@ -54,6 +54,23 @@
 sudo bash <(curl -sL https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh)
 ```
 
+> **ریپو خصوصی است؟** `rahro-tunnel` خصوصی است، پس لینک یک‌خطی بالا فقط وقتی کار
+> می‌کند که ریپو عمومی باشد (یا توکن بدهی). برای ریپوی خصوصی، با یک **Personal
+> Access Token** گیت‌هاب کلون کن و اسکریپت را از داخل همان پوشه اجرا کن — خودش
+> سورس محلی را تشخیص می‌دهد و از همان‌جا بیلد می‌کند (بدون دانلود دوباره):
+>
+> ```bash
+> apt-get update && apt-get install -y git curl
+> git clone https://github.com/AwmiresGg/rahro-tunnel.git   # نام کاربری + توکن (PAT) به‌جای رمز
+> cd rahro-tunnel
+> sudo bash scripts/install.sh                              # پنل
+> # نود:    sudo bash scripts/install.sh node   <code> -panel https://PANEL:2053 -insecure
+> # تانل:   sudo bash scripts/install.sh tunnel <code> -panel https://PANEL:2053 -insecure
+> ```
+>
+> بعضی ترمینال‌های موبایل/SSH از `<(...)` پشتیبانی نمی‌کنند و خطای
+> `/dev/fd/63: No such file or directory` می‌دهند؛ روش کلون بالا این مشکل را ندارد.
+
 این اسکریپت Rahro را می‌سازد (اگر لازم باشد Go را نصب می‌کند)، فایل
 `/etc/rahro/panel.json` را می‌نویسد، یک ادمین می‌سازد، و سرویس systemd به نام
 `rahro-panel` را راه می‌اندازد. در پایان **آدرس پنل** و **اطلاعات ورود ادمین** را
