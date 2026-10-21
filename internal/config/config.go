@@ -57,6 +57,8 @@ type ClientConfig struct {
 	Transport string `json:"transport"`
 	// PublicKey is the server's long-term X25519 public key (base64).
 	PublicKey string `json:"public_key"`
+	// UUID identifies this user to the server (32 hex chars, dashes allowed).
+	UUID string `json:"uuid"`
 	// SNI is the TLS server name to present (should match the decoy).
 	SNI string `json:"sni,omitempty"`
 	// SOCKS is the local SOCKS5 inbound address, e.g. "127.0.0.1:1080".
@@ -275,10 +277,33 @@ func (c *ClientConfig) validate() error {
 	if c.PublicKey == "" {
 		return fmt.Errorf("client.public_key is required")
 	}
+	if c.UUID == "" {
+		return fmt.Errorf("client.uuid is required")
+	}
+	if _, err := c.UserID(); err != nil {
+		return fmt.Errorf("client.uuid: %w", err)
+	}
 	if c.SOCKS == "" && c.HTTP == "" {
 		return fmt.Errorf("client needs at least one inbound (socks or http)")
 	}
 	return nil
+}
+
+// UserID parses the client UUID (32 hex chars, dashes optional) into 16 bytes.
+func (c *ClientConfig) UserID() ([16]byte, error) {
+	var id [16]byte
+	hexStr := strings.ReplaceAll(c.UUID, "-", "")
+	if len(hexStr) != 32 {
+		return id, fmt.Errorf("must be 32 hex chars (16 bytes), got %d", len(hexStr))
+	}
+	for i := 0; i < 16; i++ {
+		var b int
+		if _, err := fmt.Sscanf(hexStr[i*2:i*2+2], "%02x", &b); err != nil {
+			return id, fmt.Errorf("invalid hex: %w", err)
+		}
+		id[i] = byte(b)
+	}
+	return id, nil
 }
 
 func (p *PanelConfig) validate() error {

@@ -97,6 +97,7 @@ func TestClientValidation(t *testing.T) {
 	c := &Config{Client: &ClientConfig{
 		Server:    "vps.example.com:443",
 		PublicKey: "AAAA",
+		UUID:      "00112233445566778899aabbccddeeff",
 		SOCKS:     "127.0.0.1:1080",
 	}}
 	if err := c.Validate(); err != nil {
