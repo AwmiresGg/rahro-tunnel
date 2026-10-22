@@ -34,11 +34,18 @@ func run(args []string) error {
 		return cmdAdmin(args)
 	case "token":
 		return cmdToken(args)
+	case "menu":
+		fs := flag.NewFlagSet("menu", flag.ContinueOnError)
+		configPath := fs.String("config", "/etc/rahro/panel.json", "config file")
+		if err := fs.Parse(args); err != nil {
+			return err
+		}
+		return cmdMenu(*configPath)
 	case "version":
 		fmt.Println(version.String())
 		return nil
 	default:
-		return fmt.Errorf("unknown command %q (run|admin|token|version)", cmd)
+		return fmt.Errorf("unknown command %q (run|menu|admin|token|version)", cmd)
 	}
 }
 

@@ -63,6 +63,21 @@ func (s *Store) UpdateAdminCredentials(id int64, username, passwordHash string) 
 	return nil
 }
 
+// FirstAdmin returns the lowest-id admin (the primary account), or ErrNotFound.
+func (s *Store) FirstAdmin() (*Admin, error) {
+	var a Admin
+	err := s.db.QueryRow(
+		`SELECT id, username, password_hash, totp_secret, created_at FROM admins ORDER BY id LIMIT 1`).
+		Scan(&a.ID, &a.Username, &a.PasswordHash, &a.TOTPSecret, &a.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
 // CountAdmins returns the number of admins (used to detect first-run).
 func (s *Store) CountAdmins() (int, error) {
 	var n int

@@ -171,9 +171,17 @@ EOF
 
   setup_service rahro-panel "$PREFIX/rahro-panel run -config $cfg"
 
+  # 'rahro' management menu (x-ui style).
+  cat > "$PREFIX/rahro" <<EOF
+#!/usr/bin/env bash
+exec $PREFIX/rahro-panel menu -config $cfg "\$@"
+EOF
+  chmod +x "$PREFIX/rahro"
+
   echo
   ok "Rahro panel installed."
-  echo -e "   URL:   ${c_green}https://${ip}:2053${c_reset}   (self-signed cert — accept the browser warning)"
+  echo -e "   URL:    ${c_green}https://${ip}:2053${c_reset}   (self-signed cert — accept the browser warning)"
+  echo -e "   Manage: type ${c_green}rahro${c_reset} for the terminal menu (port, SSL, admin, update, …)"
   if [ "$created" = "1" ]; then
     echo -e "   Login: ${c_green}${user}${c_reset} / ${c_green}${pass}${c_reset}    ← save this now"
   else
