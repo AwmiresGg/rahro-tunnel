@@ -31,7 +31,7 @@ func (s *Server) inboundLinks(u *store.User) []string {
 	inbounds, _ := s.Store.ListInbounds()
 	var links []string
 	for _, in := range inbounds {
-		if !in.Enabled {
+		if !in.Enabled || !u.ServesInbound(in.Tag) {
 			continue
 		}
 		if l := xray.ShareLink(in, u, host); l != "" {

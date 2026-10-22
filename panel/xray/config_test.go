@@ -122,6 +122,40 @@ func TestGenerateConfigNoUsers(t *testing.T) {
 	}
 }
 
+// TestGenerateConfigInboundAssignment verifies users are only added as clients
+// to the inbounds they are assigned to (empty assignment = all inbounds).
+func TestGenerateConfigInboundAssignment(t *testing.T) {
+	inbounds := []*store.Inbound{
+		{Tag: "a", Protocol: store.ProtoVLESS, Port: 443, Enabled: true},
+		{Tag: "b", Protocol: store.ProtoVLESS, Port: 8443, Enabled: true},
+	}
+	users := []*store.User{
+		{Username: "all", UUID: "u-all", Enabled: true},                     // no assignment -> both
+		{Username: "onlyA", UUID: "u-a", Enabled: true, InboundTags: "a"},   // only inbound a
+		{Username: "onlyB", UUID: "u-b", Enabled: true, InboundTags: "b,c"}, // b (c doesn't exist)
+	}
+	cfg := GenerateConfig(inbounds, users)
+	clientsOf := func(tag string) map[string]bool {
+		set := map[string]bool{}
+		for _, in := range userInbounds(cfg) {
+			if in["tag"] != tag {
+				continue
+			}
+			for _, c := range in["settings"].(map[string]any)["clients"].([]map[string]any) {
+				set[c["id"].(string)] = true
+			}
+		}
+		return set
+	}
+	a, b := clientsOf("a"), clientsOf("b")
+	if !a["u-all"] || !a["u-a"] || a["u-b"] {
+		t.Fatalf("inbound a clients wrong: %v", a)
+	}
+	if !b["u-all"] || !b["u-b"] || b["u-a"] {
+		t.Fatalf("inbound b clients wrong: %v", b)
+	}
+}
+
 // TestGenerateConfigStatsAPI verifies the stats/api scaffolding needed for
 // per-user traffic metering is present and wired by routing.
 func TestGenerateConfigStatsAPI(t *testing.T) {

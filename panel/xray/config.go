@@ -81,6 +81,14 @@ func buildInbound(in *store.Inbound, users []*store.User) map[string]any {
 		_ = json.Unmarshal([]byte(in.Settings), &extra)
 	}
 
+	// Only serve users assigned to this inbound (empty assignment = all).
+	served := make([]*store.User, 0, len(users))
+	for _, u := range users {
+		if u.ServesInbound(in.Tag) {
+			served = append(served, u)
+		}
+	}
+
 	listen := in.Listen
 	if listen == "" {
 		listen = "0.0.0.0"
@@ -91,7 +99,7 @@ func buildInbound(in *store.Inbound, users []*store.User) map[string]any {
 		"listen":         listen,
 		"port":           in.Port,
 		"protocol":       in.Protocol,
-		"settings":       buildSettings(in.Protocol, users, extra),
+		"settings":       buildSettings(in.Protocol, served, extra),
 		"streamSettings": buildStream(in.Network, in.Security, extra),
 	}
 	// Optional sniffing (helps routing/stats); harmless default.

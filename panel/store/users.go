@@ -2,6 +2,8 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -18,7 +20,48 @@ type User struct {
 	IPLimit    int    `json:"ip_limit"`   // max concurrent source IPs; 0 = unlimited
 	ResetDays  int    `json:"reset_days"` // auto-reset used traffic every N days; 0 = off
 	LastReset  int64  `json:"last_reset"` // unix of last traffic reset
-	CreatedAt  int64  `json:"created_at"`
+	// InboundTags limits which inbounds serve this user, as a comma-separated
+	// list of inbound tags. Empty means every inbound serves the user.
+	InboundTags string `json:"inbound_tags"`
+	CreatedAt   int64  `json:"created_at"`
+}
+
+// MarshalJSON adds the computed "active" flag so clients (the panel UI, the
+// bot) see whether the user may currently connect without recomputing it.
+func (u *User) MarshalJSON() ([]byte, error) {
+	type alias User
+	return json.Marshal(struct {
+		*alias
+		Active bool `json:"active"`
+	}{(*alias)(u), u.Active()})
+}
+
+// Inbounds returns the user's assigned inbound tags, or nil for "all".
+func (u *User) Inbounds() []string {
+	if strings.TrimSpace(u.InboundTags) == "" {
+		return nil
+	}
+	var out []string
+	for _, t := range strings.Split(u.InboundTags, ",") {
+		if t = strings.TrimSpace(t); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// ServesInbound reports whether the given inbound tag serves this user.
+func (u *User) ServesInbound(tag string) bool {
+	tags := u.Inbounds()
+	if len(tags) == 0 {
+		return true
+	}
+	for _, t := range tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
 }
 
 // Active reports whether the user may currently connect.
@@ -42,10 +85,10 @@ func (s *Store) CreateUser(u *User) (*User, error) {
 		u.LastReset = u.CreatedAt
 	}
 	res, err := s.db.Exec(
-		`INSERT INTO users (username, uuid, sub_token, quota_bytes, used_bytes, expires_at, enabled, ip_limit, reset_days, last_reset, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO users (username, uuid, sub_token, quota_bytes, used_bytes, expires_at, enabled, ip_limit, reset_days, last_reset, inbound_tags, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		u.Username, u.UUID, u.SubToken, u.QuotaBytes, u.UsedBytes, u.ExpiresAt, b2i(u.Enabled),
-		u.IPLimit, u.ResetDays, u.LastReset, u.CreatedAt)
+		u.IPLimit, u.ResetDays, u.LastReset, u.InboundTags, u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -53,12 +96,12 @@ func (s *Store) CreateUser(u *User) (*User, error) {
 	return u, nil
 }
 
-const userCols = `id, username, uuid, sub_token, quota_bytes, used_bytes, expires_at, enabled, ip_limit, reset_days, last_reset, created_at`
+const userCols = `id, username, uuid, sub_token, quota_bytes, used_bytes, expires_at, enabled, ip_limit, reset_days, last_reset, inbound_tags, created_at`
 
 func scanUser(sc interface{ Scan(...any) error }) (*User, error) {
 	var u User
 	var enabled int
-	if err := sc.Scan(&u.ID, &u.Username, &u.UUID, &u.SubToken, &u.QuotaBytes, &u.UsedBytes, &u.ExpiresAt, &enabled, &u.IPLimit, &u.ResetDays, &u.LastReset, &u.CreatedAt); err != nil {
+	if err := sc.Scan(&u.ID, &u.Username, &u.UUID, &u.SubToken, &u.QuotaBytes, &u.UsedBytes, &u.ExpiresAt, &enabled, &u.IPLimit, &u.ResetDays, &u.LastReset, &u.InboundTags, &u.CreatedAt); err != nil {
 		return nil, err
 	}
 	u.Enabled = enabled != 0
@@ -114,9 +157,9 @@ func (s *Store) GetUserBySubToken(tok string) (*User, error) { return s.getUserB
 // UpdateUser updates mutable fields of a user.
 func (s *Store) UpdateUser(u *User) error {
 	res, err := s.db.Exec(
-		`UPDATE users SET username=?, quota_bytes=?, used_bytes=?, expires_at=?, enabled=?, ip_limit=?, reset_days=?, last_reset=? WHERE id=?`,
+		`UPDATE users SET username=?, quota_bytes=?, used_bytes=?, expires_at=?, enabled=?, ip_limit=?, reset_days=?, last_reset=?, inbound_tags=? WHERE id=?`,
 		u.Username, u.QuotaBytes, u.UsedBytes, u.ExpiresAt, b2i(u.Enabled),
-		u.IPLimit, u.ResetDays, u.LastReset, u.ID)
+		u.IPLimit, u.ResetDays, u.LastReset, u.InboundTags, u.ID)
 	if err != nil {
 		return err
 	}

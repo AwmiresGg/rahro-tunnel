@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS inbounds (
 		`ALTER TABLE users ADD COLUMN ip_limit INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE users ADD COLUMN reset_days INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE users ADD COLUMN last_reset INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE users ADD COLUMN inbound_tags TEXT NOT NULL DEFAULT ''`,
 	} {
 		if _, err := s.db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return fmt.Errorf("store: migrate alter: %w", err)

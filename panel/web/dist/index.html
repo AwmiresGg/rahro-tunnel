@@ -160,33 +160,44 @@ async function xrayApply(){try{await api('POST','/api/xray/apply');toast('Xray r
 async function renderUsers(){
   const u=await api('GET','/api/users');
   let on={}; try{on=await api('GET','/api/onlines')}catch(e){}
+  let ins=[]; try{ins=await api('GET','/api/inbounds')}catch(e){}
+  const enIns=ins.filter(i=>i.enabled);
   let rows=u.map(x=>{
     const o=on[x.username], ips=o?o.ips:[], online=o?o.online:0;
     const dot=online>0?`<span class="badge b-ok" title="${esc(ips.join(', '))}">● ${online} online</span>`
       : ips.length?`<span class="badge b-warn" title="${esc(ips.join(', '))}">${ips.length} IP</span>`:'';
     const lim=x.ip_limit>0?`<div class="mono" style="color:var(--dim)">IP≤${x.ip_limit}</div>`:'';
     const cyc=x.reset_days>0?`<div class="mono" style="color:var(--dim)">↻${x.reset_days}d</div>`:'';
+    const ib=x.inbound_tags?esc(x.inbound_tags):'<span style="color:var(--dim)">all</span>';
     return `<tr>
     <td><b>${esc(x.username)}</b><div class="mono">${x.uuid.slice(0,12)}…</div></td>
     <td>${used(x.used_bytes)} / ${gb(x.quota_bytes)}${cyc}</td>
+    <td class="mono" style="font-size:12px">${ib}</td>
     <td>${when(x.expires_at)}${lim}</td>
     <td>${x.active?'<span class="badge b-ok">active</span>':'<span class="badge b-bad">inactive</span>'} ${dot}</td>
     <td><button class="btn-ghost" onclick="copySub('${x.sub_token}')">sub</button>
         <button class="btn-ghost" onclick="resetUser(${x.id})" title="Reset used traffic">↻</button>
         <button class="btn-danger" onclick="delUser(${x.id})">del</button></td></tr>`}).join('');
+  const ibChecks=enIns.length
+    ? enIns.map(i=>`<label style="display:inline-flex;align-items:center;gap:5px;margin:2px 10px 2px 0;font-weight:400"><input type="checkbox" class="ibchk" value="${esc(i.tag)}"> ${esc(i.tag)}</label>`).join('')
+    : '<span style="color:var(--dim)">No enabled inbounds yet — create one in the Inbounds tab first, otherwise users have nothing to connect to.</span>';
   $('#content').innerHTML=`<div class="card"><div class="row">
       <div><label>Username</label><input id="nu" class="in"></div>
       <div><label>Quota (GB, 0=∞)</label><input id="nq" class="in" type="number" value="100"></div>
       <div><label>Days (0=never)</label><input id="nd" class="in" type="number" value="30"></div>
       <div><label>IP limit (0=∞)</label><input id="nil" class="in" type="number" value="0"></div>
       <div><label>Reset cycle (days, 0=off)</label><input id="nrd" class="in" type="number" value="0"></div>
-      <div style="flex:0"><button class="btn" onclick="addUser()">+ Add user</button></div>
-    </div></div>
-    <table><thead><tr><th>User</th><th>Usage</th><th>Expiry</th><th>Status</th><th></th></tr></thead>
-    <tbody>${rows||'<tr><td colspan=5 style="color:var(--dim)">No users yet</td></tr>'}</tbody></table>`;
+    </div>
+    <div style="margin-top:10px"><label>Inbounds (none checked = all)</label><div style="margin-top:4px">${ibChecks}</div></div>
+    <div style="margin-top:10px"><button class="btn" onclick="addUser()">+ Add user</button></div>
+    </div>
+    <table><thead><tr><th>User</th><th>Usage</th><th>Inbounds</th><th>Expiry</th><th>Status</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan=6 style="color:var(--dim)">No users yet</td></tr>'}</tbody></table>`;
 }
 async function addUser(){try{
-  await api('POST','/api/users',{username:$('#nu').value,quota_gb:+$('#nq').value,days:+$('#nd').value,ip_limit:+$('#nil').value,reset_days:+$('#nrd').value});
+  if(!$('#nu').value.trim())return toast('Username is required');
+  const tags=[...document.querySelectorAll('.ibchk:checked')].map(c=>c.value);
+  await api('POST','/api/users',{username:$('#nu').value,quota_gb:+$('#nq').value,days:+$('#nd').value,ip_limit:+$('#nil').value,reset_days:+$('#nrd').value,inbound_tags:tags});
   renderUsers();toast('User created');
 }catch(e){toast(e.message)}}
 async function resetUser(id){if(!confirm('Reset this user\'s used traffic to zero?'))return;try{await api('POST','/api/users/'+id+'/reset');renderUsers();toast('Traffic reset')}catch(e){toast(e.message)}}

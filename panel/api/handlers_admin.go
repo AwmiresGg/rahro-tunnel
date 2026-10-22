@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/awmiresgg/rahro/panel/auth"
@@ -25,12 +26,13 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 type createUserReq struct {
-	Username  string `json:"username"`
-	QuotaGB   int64  `json:"quota_gb"`   // 0 = unlimited
-	Days      int64  `json:"days"`       // 0 = never expires
-	IPLimit   int    `json:"ip_limit"`   // 0 = unlimited
-	ResetDays int    `json:"reset_days"` // 0 = no auto reset
-	Enabled   *bool  `json:"enabled"`
+	Username    string   `json:"username"`
+	QuotaGB     int64    `json:"quota_gb"`     // 0 = unlimited
+	Days        int64    `json:"days"`         // 0 = never expires
+	IPLimit     int      `json:"ip_limit"`     // 0 = unlimited
+	ResetDays   int      `json:"reset_days"`   // 0 = no auto reset
+	InboundTags []string `json:"inbound_tags"` // empty = all inbounds
+	Enabled     *bool    `json:"enabled"`
 }
 
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -40,13 +42,14 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := &store.User{
-		Username:   req.Username,
-		UUID:       auth.NewUUIDHex(),
-		SubToken:   auth.NewToken(18),
-		QuotaBytes: req.QuotaGB * gib,
-		IPLimit:    req.IPLimit,
-		ResetDays:  req.ResetDays,
-		Enabled:    true,
+		Username:    req.Username,
+		UUID:        auth.NewUUIDHex(),
+		SubToken:    auth.NewToken(18),
+		QuotaBytes:  req.QuotaGB * gib,
+		IPLimit:     req.IPLimit,
+		ResetDays:   req.ResetDays,
+		InboundTags: strings.Join(req.InboundTags, ","),
+		Enabled:     true,
 	}
 	if req.Enabled != nil {
 		u.Enabled = *req.Enabled
@@ -78,13 +81,14 @@ func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateUserReq struct {
-	Username   *string `json:"username"`
-	QuotaBytes *int64  `json:"quota_bytes"`
-	UsedBytes  *int64  `json:"used_bytes"`
-	ExpiresAt  *int64  `json:"expires_at"`
-	Enabled    *bool   `json:"enabled"`
-	IPLimit    *int    `json:"ip_limit"`
-	ResetDays  *int    `json:"reset_days"`
+	Username    *string   `json:"username"`
+	QuotaBytes  *int64    `json:"quota_bytes"`
+	UsedBytes   *int64    `json:"used_bytes"`
+	ExpiresAt   *int64    `json:"expires_at"`
+	Enabled     *bool     `json:"enabled"`
+	IPLimit     *int      `json:"ip_limit"`
+	ResetDays   *int      `json:"reset_days"`
+	InboundTags *[]string `json:"inbound_tags"`
 }
 
 func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -123,6 +127,9 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.ResetDays != nil {
 		u.ResetDays = *req.ResetDays
+	}
+	if req.InboundTags != nil {
+		u.InboundTags = strings.Join(*req.InboundTags, ",")
 	}
 	if err := s.Store.UpdateUser(u); err != nil {
 		httpError(w, http.StatusInternalServerError, err.Error())
