@@ -72,6 +72,7 @@
     <nav>
       <a data-view="dash" class="active" onclick="show('dash')">Dashboard</a>
       <a data-view="users" onclick="show('users')">Users</a>
+      <a data-view="inbounds" onclick="show('inbounds')">Inbounds</a>
       <a data-view="nodes" onclick="show('nodes')">Nodes &amp; tunnels</a>
       <a data-view="tokens" onclick="show('tokens')">API tokens</a>
       <a data-view="settings" onclick="show('settings')">Settings</a>
@@ -111,8 +112,8 @@ async function login(){
 async function logout(){try{await api('POST','/api/logout')}catch(e){};showLogin()}
 function show(v){
   document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('active',a.dataset.view===v));
-  $('#title').textContent={dash:'Dashboard',users:'Users',nodes:'Nodes & tunnels',tokens:'API tokens',settings:'Settings'}[v];
-  ({dash:renderDash,users:renderUsers,nodes:renderNodes,tokens:renderTokens,settings:renderSettings}[v])();
+  $('#title').textContent={dash:'Dashboard',users:'Users',inbounds:'Inbounds',nodes:'Nodes & tunnels',tokens:'API tokens',settings:'Settings'}[v];
+  ({dash:renderDash,users:renderUsers,inbounds:renderInbounds,nodes:renderNodes,tokens:renderTokens,settings:renderSettings}[v])();
 }
 const gb=n=>n?(n/1073741824).toFixed(0)+' GB':'∞';
 const when=t=>t?new Date(t*1000).toISOString().slice(0,10):'—';
@@ -151,6 +152,31 @@ async function addUser(){try{
 }catch(e){toast(e.message)}}
 async function delUser(id){if(!confirm('Delete user?'))return;await api('DELETE','/api/users/'+id);renderUsers()}
 function copySub(tok){const url=location.origin+'/sub/'+tok;navigator.clipboard?.writeText(url);toast('Subscription link copied: '+url)}
+
+async function renderInbounds(){
+  const ins=await api('GET','/api/inbounds');
+  let rows=ins.map(x=>`<tr>
+    <td><b>${esc(x.tag)}</b>${x.remark?'<div class="mono">'+esc(x.remark)+'</div>':''}</td>
+    <td>${esc(x.protocol)}</td><td class="mono">${x.port}</td>
+    <td>${esc(x.network)} / ${esc(x.security)}</td>
+    <td>${x.enabled?'<span class="badge b-ok">on</span>':'<span class="badge b-bad">off</span>'}</td>
+    <td><button class="btn-danger" onclick="delInbound(${x.id})">del</button></td></tr>`).join('');
+  $('#content').innerHTML=`<div class="card"><div class="row">
+      <div><label>Tag</label><input id="itag" class="in" placeholder="vless-reality-443"></div>
+      <div><label>Protocol</label><select id="iproto" class="in"><option value="vless">VLESS</option><option value="vmess">VMess</option><option value="trojan">Trojan</option><option value="shadowsocks">Shadowsocks</option></select></div>
+      <div><label>Port</label><input id="iport" class="in" type="number" value="443"></div>
+      <div><label>Network</label><select id="inet" class="in"><option>tcp</option><option>ws</option><option>grpc</option><option>http</option><option>quic</option></select></div>
+      <div><label>Security</label><select id="isec" class="in"><option>reality</option><option>tls</option><option>none</option></select></div>
+      <div style="flex:0"><button class="btn" onclick="addInbound()">+ Add inbound</button></div>
+    </div><div style="font-size:11px;color:var(--dim);margin-top:8px">Active users are offered as clients on every enabled inbound. Xray-core serving is the next milestone; these definitions already drive its config.</div></div>
+    <table><thead><tr><th>Tag</th><th>Protocol</th><th>Port</th><th>Transport</th><th>Status</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan=6 style="color:var(--dim)">No inbounds yet</td></tr>'}</tbody></table>`;
+}
+async function addInbound(){try{
+  await api('POST','/api/inbounds',{tag:$('#itag').value,protocol:$('#iproto').value,port:+$('#iport').value,network:$('#inet').value,security:$('#isec').value});
+  renderInbounds();toast('Inbound created');
+}catch(e){toast(e.message)}}
+async function delInbound(id){if(!confirm('Delete inbound?'))return;await api('DELETE','/api/inbounds/'+id);renderInbounds()}
 
 async function renderNodes(){
   const n=await api('GET','/api/nodes');

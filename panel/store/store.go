@@ -86,6 +86,19 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS inbounds (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tag TEXT UNIQUE NOT NULL,
+  protocol TEXT NOT NULL,
+  listen TEXT NOT NULL DEFAULT '',
+  port INTEGER NOT NULL,
+  network TEXT NOT NULL DEFAULT 'tcp',
+  security TEXT NOT NULL DEFAULT 'tls',
+  settings TEXT NOT NULL DEFAULT '{}',
+  remark TEXT NOT NULL DEFAULT '',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
+);
 `
 	if _, err := s.db.Exec(schema); err != nil {
 		return fmt.Errorf("store: migrate: %w", err)

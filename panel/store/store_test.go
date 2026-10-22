@@ -131,6 +131,40 @@ func TestNodeEnrollment(t *testing.T) {
 	}
 }
 
+func TestInboundCRUD(t *testing.T) {
+	s := newTestStore(t)
+	in, err := s.CreateInbound(&Inbound{Tag: "vless-443", Protocol: ProtoVLESS, Port: 443, Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Network != "tcp" || in.Security != "tls" || in.Settings != "{}" {
+		t.Fatalf("defaults not applied: %+v", in)
+	}
+	in.Port = 8443
+	in.Remark = "main"
+	if err := s.UpdateInbound(in); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := s.GetInbound(in.ID)
+	if got.Port != 8443 || got.Remark != "main" {
+		t.Fatalf("update not persisted: %+v", got)
+	}
+	// Duplicate tag rejected.
+	if _, err := s.CreateInbound(&Inbound{Tag: "vless-443", Protocol: ProtoVLESS, Port: 1}); err == nil {
+		t.Fatal("duplicate tag should fail")
+	}
+	list, _ := s.ListInbounds()
+	if len(list) != 1 {
+		t.Fatalf("want 1 inbound, got %d", len(list))
+	}
+	if err := s.DeleteInbound(in.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetInbound(in.ID); err != ErrNotFound {
+		t.Fatal("inbound should be gone")
+	}
+}
+
 func TestAPITokensAndSettings(t *testing.T) {
 	s := newTestStore(t)
 	if _, err := s.CreateAPIToken("bot", "hash-abc", "users:write"); err != nil {

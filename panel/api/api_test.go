@@ -115,6 +115,32 @@ func TestChangeAccount(t *testing.T) {
 	}
 }
 
+func TestInboundsAPI(t *testing.T) {
+	ts, _ := setup(t)
+	jar, _ := cookiejar.New(nil)
+	c := &http.Client{Jar: jar}
+	postJSON(t, c, ts.URL+"/api/login", `{"username":"admin","password":"adminpass"}`, nil)
+
+	// Invalid protocol rejected.
+	if code := postJSON(t, c, ts.URL+"/api/inbounds", `{"tag":"x","protocol":"bogus","port":443}`, nil); code != 400 {
+		t.Fatalf("bad protocol should be 400, got %d", code)
+	}
+	// Create valid.
+	var in store.Inbound
+	if code := postJSON(t, c, ts.URL+"/api/inbounds", `{"tag":"vless-443","protocol":"vless","port":443,"network":"tcp","security":"reality"}`, &in); code != 201 {
+		t.Fatalf("create inbound: %d", code)
+	}
+	if in.ID == 0 || in.Security != "reality" {
+		t.Fatalf("unexpected inbound: %+v", in)
+	}
+	// List.
+	var list []store.Inbound
+	getJSON(t, c, ts.URL+"/api/inbounds", &list)
+	if len(list) != 1 {
+		t.Fatalf("want 1 inbound, got %d", len(list))
+	}
+}
+
 func TestBotAPIFlow(t *testing.T) {
 	ts, st := setup(t)
 	// Create an API token directly in the store.
