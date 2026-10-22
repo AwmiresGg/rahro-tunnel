@@ -52,6 +52,7 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("POST /api/login", s.handleLogin)
 	mux.HandleFunc("POST /api/logout", s.handleLogout)
 	mux.HandleFunc("GET /api/me", s.admin(s.handleMe))
+	mux.HandleFunc("POST /api/account", s.admin(s.handleChangeAccount))
 	mux.HandleFunc("GET /api/stats", s.admin(s.handleStats))
 
 	// Users.
@@ -187,6 +188,62 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	sess := s.sessions[c.Value]
 	s.mu.Unlock()
 	writeJSON(w, http.StatusOK, map[string]string{"username": sess.admin})
+}
+
+// handleChangeAccount changes the logged-in admin's username and/or password.
+// The current password is always required.
+func (s *Server) handleChangeAccount(w http.ResponseWriter, r *http.Request) {
+	c, _ := r.Cookie(sessionCookie)
+	s.mu.Lock()
+	sess := s.sessions[c.Value]
+	s.mu.Unlock()
+
+	admin, err := s.Store.GetAdmin(sess.admin)
+	if err != nil {
+		httpError(w, http.StatusUnauthorized, "account not found")
+		return
+	}
+	var req struct {
+		CurrentPassword string `json:"current_password"`
+		NewUsername     string `json:"new_username"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		httpError(w, http.StatusBadRequest, "bad request")
+		return
+	}
+	if !auth.VerifyPassword(req.CurrentPassword, admin.PasswordHash) {
+		httpError(w, http.StatusUnauthorized, "current password is incorrect")
+		return
+	}
+	newUser := admin.Username
+	if req.NewUsername != "" {
+		newUser = req.NewUsername
+	}
+	newHash := admin.PasswordHash
+	if req.NewPassword != "" {
+		if len(req.NewPassword) < 6 {
+			httpError(w, http.StatusBadRequest, "new password must be at least 6 characters")
+			return
+		}
+		h, err := auth.HashPassword(req.NewPassword)
+		if err != nil {
+			httpError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		newHash = h
+	}
+	if err := s.Store.UpdateAdminCredentials(admin.ID, newUser, newHash); err != nil {
+		httpError(w, http.StatusConflict, "could not update (is the username already taken?)")
+		return
+	}
+	s.mu.Lock()
+	if sv, ok := s.sessions[c.Value]; ok {
+		sv.admin = newUser
+		s.sessions[c.Value] = sv
+	}
+	s.mu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]string{"username": newUser})
 }
 
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {

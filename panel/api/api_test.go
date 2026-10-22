@@ -76,6 +76,45 @@ func TestAdminLoginAndUserCRUD(t *testing.T) {
 	}
 }
 
+func TestChangeAccount(t *testing.T) {
+	ts, st := setup(t)
+	jar, _ := cookiejar.New(nil)
+	c := &http.Client{Jar: jar}
+	if code := postJSON(t, c, ts.URL+"/api/login", `{"username":"admin","password":"adminpass"}`, nil); code != 200 {
+		t.Fatalf("login: %d", code)
+	}
+
+	// Wrong current password is rejected.
+	if code := postJSON(t, c, ts.URL+"/api/account", `{"current_password":"nope","new_password":"brandnew1"}`, nil); code != 401 {
+		t.Fatalf("wrong current password should be 401, got %d", code)
+	}
+	// Change username + password.
+	if code := postJSON(t, c, ts.URL+"/api/account", `{"current_password":"adminpass","new_username":"boss","new_password":"brandnew1"}`, nil); code != 200 {
+		t.Fatalf("change account: %d", code)
+	}
+	// The stored admin reflects the change.
+	a, err := st.GetAdmin("boss")
+	if err != nil {
+		t.Fatalf("renamed admin not found: %v", err)
+	}
+	if !auth.VerifyPassword("brandnew1", a.PasswordHash) {
+		t.Fatal("new password does not verify")
+	}
+	if _, err := st.GetAdmin("admin"); err == nil {
+		t.Fatal("old username should no longer exist")
+	}
+
+	// A fresh login works only with the new credentials.
+	jar2, _ := cookiejar.New(nil)
+	c2 := &http.Client{Jar: jar2}
+	if code := postJSON(t, c2, ts.URL+"/api/login", `{"username":"admin","password":"adminpass"}`, nil); code != 401 {
+		t.Fatalf("old creds should fail, got %d", code)
+	}
+	if code := postJSON(t, c2, ts.URL+"/api/login", `{"username":"boss","password":"brandnew1"}`, nil); code != 200 {
+		t.Fatalf("new creds should work, got %d", code)
+	}
+}
+
 func TestBotAPIFlow(t *testing.T) {
 	ts, st := setup(t)
 	// Create an API token directly in the store.

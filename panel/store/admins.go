@@ -50,6 +50,19 @@ func (s *Store) UpdateAdminPassword(username, passwordHash string) error {
 	return nil
 }
 
+// UpdateAdminCredentials changes an admin's username and/or password hash by id.
+func (s *Store) UpdateAdminCredentials(id int64, username, passwordHash string) error {
+	res, err := s.db.Exec(`UPDATE admins SET username = ?, password_hash = ? WHERE id = ?`,
+		username, passwordHash, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // CountAdmins returns the number of admins (used to detect first-run).
 func (s *Store) CountAdmins() (int, error) {
 	var n int

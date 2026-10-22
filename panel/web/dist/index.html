@@ -74,6 +74,7 @@
       <a data-view="users" onclick="show('users')">Users</a>
       <a data-view="nodes" onclick="show('nodes')">Nodes &amp; tunnels</a>
       <a data-view="tokens" onclick="show('tokens')">API tokens</a>
+      <a data-view="settings" onclick="show('settings')">Settings</a>
     </nav>
     <div style="margin-top:auto"><button class="btn-ghost" style="width:100%" onclick="logout()">Sign out</button></div>
   </aside>
@@ -110,8 +111,8 @@ async function login(){
 async function logout(){try{await api('POST','/api/logout')}catch(e){};showLogin()}
 function show(v){
   document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('active',a.dataset.view===v));
-  $('#title').textContent={dash:'Dashboard',users:'Users',nodes:'Nodes & tunnels',tokens:'API tokens'}[v];
-  ({dash:renderDash,users:renderUsers,nodes:renderNodes,tokens:renderTokens}[v])();
+  $('#title').textContent={dash:'Dashboard',users:'Users',nodes:'Nodes & tunnels',tokens:'API tokens',settings:'Settings'}[v];
+  ({dash:renderDash,users:renderUsers,nodes:renderNodes,tokens:renderTokens,settings:renderSettings}[v])();
 }
 const gb=n=>n?(n/1073741824).toFixed(0)+' GB':'∞';
 const when=t=>t?new Date(t*1000).toISOString().slice(0,10):'—';
@@ -195,6 +196,26 @@ async function addToken(){try{
 }catch(e){toast(e.message)}}
 async function delToken(id){if(!confirm('Delete token?'))return;await api('DELETE','/api/tokens/'+id);renderTokens()}
 
+function renderSettings(){
+  $('#content').innerHTML=`<div class="card" style="max-width:520px">
+      <div style="font-size:14px;font-weight:600;margin-bottom:4px">Admin account</div>
+      <div style="color:var(--dim);font-size:12px;margin-bottom:14px">Change your panel username and password. Your current password is required.</div>
+      <label>Current password</label><input id="cp" class="in" type="password" style="margin-bottom:12px">
+      <label>New username (optional)</label><input id="nus" class="in" placeholder="leave blank to keep" style="margin-bottom:12px">
+      <label>New password (optional, min 6)</label><input id="nps" class="in" type="password" placeholder="leave blank to keep" style="margin-bottom:16px">
+      <button class="btn" onclick="changeAccount()">Save changes</button>
+      <div id="serr" style="font-size:12px;margin-top:10px"></div>
+    </div>`;
+}
+async function changeAccount(){
+  const body={current_password:$('#cp').value,new_username:$('#nus').value,new_password:$('#nps').value};
+  try{
+    const r=await api('POST','/api/account',body);
+    $('#who').textContent=r.username;
+    $('#serr').style.color='var(--ok)';$('#serr').textContent='Saved. Username is now "'+r.username+'".';
+    $('#cp').value='';$('#nus').value='';$('#nps').value='';
+  }catch(e){$('#serr').style.color='var(--bad)';$('#serr').textContent=e.message}
+}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 
 // Auto-enter the app if already authenticated.
