@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -78,36 +79,59 @@ func postJSON(c *http.Client, url string, req, resp any) error {
 	return nil
 }
 
-func cmdEnroll(args []string) error {
+type enrollArgs struct {
+	code     string
+	panel    string
+	out      string
+	insecure bool
+}
+
+// parseEnrollArgs peels the connection code (first positional) off, then parses
+// the flags that follow. Go's flag package stops at the first non-flag token,
+// so the code must be removed before parsing — this is what makes
+// `enroll <code> -panel <url> -insecure` work regardless of flag order.
+func parseEnrollArgs(args []string) (enrollArgs, error) {
+	var e enrollArgs
+	if len(args) < 1 || strings.HasPrefix(args[0], "-") {
+		return e, fmt.Errorf("usage: rahro-node enroll <code> -panel <url> [-insecure]")
+	}
+	e.code = args[0]
 	fs := flag.NewFlagSet("enroll", flag.ContinueOnError)
 	panelURL := fs.String("panel", "", "panel base URL, e.g. https://panel:2053")
 	insecure := fs.Bool("insecure", false, "skip TLS verification (self-signed panel)")
 	out := fs.String("out", "rahro-node.json", "where to save node credentials")
-	if err := fs.Parse(args); err != nil {
+	if err := fs.Parse(args[1:]); err != nil {
+		return e, err
+	}
+	if *panelURL == "" {
+		return e, fmt.Errorf("usage: rahro-node enroll <code> -panel <url> [-insecure]")
+	}
+	e.panel, e.insecure, e.out = *panelURL, *insecure, *out
+	return e, nil
+}
+
+func cmdEnroll(args []string) error {
+	e, err := parseEnrollArgs(args)
+	if err != nil {
 		return err
 	}
-	rest := fs.Args()
-	if len(rest) < 1 || *panelURL == "" {
-		return fmt.Errorf("usage: rahro-node enroll <code> -panel <url> [-insecure]")
-	}
-	code := rest[0]
 
 	secret := auth.NewToken(24)
 	var resp struct {
 		NodeID int64  `json:"node_id"`
 		Role   string `json:"role"`
 	}
-	if err := postJSON(httpClient(*insecure), *panelURL+"/nodeapi/enroll",
-		map[string]string{"enroll_token": code, "secret": secret}, &resp); err != nil {
+	if err := postJSON(httpClient(e.insecure), e.panel+"/nodeapi/enroll",
+		map[string]string{"enroll_token": e.code, "secret": secret}, &resp); err != nil {
 		return err
 	}
 
-	local := config.NodeLocalFile{Panel: *panelURL, NodeID: resp.NodeID, Secret: secret, Insecure: *insecure}
+	local := config.NodeLocalFile{Panel: e.panel, NodeID: resp.NodeID, Secret: secret, Insecure: e.insecure}
 	b, _ := json.MarshalIndent(local, "", "  ")
-	if err := os.WriteFile(*out, append(b, '\n'), 0o600); err != nil {
+	if err := os.WriteFile(e.out, append(b, '\n'), 0o600); err != nil {
 		return err
 	}
-	fmt.Printf("enrolled as node #%d (role %s); credentials saved to %s\n", resp.NodeID, resp.Role, *out)
+	fmt.Printf("enrolled as node #%d (role %s); credentials saved to %s\n", resp.NodeID, resp.Role, e.out)
 	fmt.Println("start it with: rahro-node run")
 	return nil
 }

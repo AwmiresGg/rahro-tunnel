@@ -76,11 +76,46 @@ build(){
   ok "installed $PREFIX/$1"
 }
 
+# setup_service installs and starts a systemd unit, degrading gracefully when
+# systemd is unavailable (containers, minimal images). It never aborts.
+setup_service(){ # $1=service name  $2=ExecStart command
+  local name="$1" exec="$2"
+  if [ -d /etc/systemd/system ]; then
+    cat > "/etc/systemd/system/$name.service" <<EOF
+[Unit]
+Description=Rahro ($name)
+After=network.target
+[Service]
+ExecStart=$exec
+Restart=always
+RestartSec=3
+WorkingDirectory=$ETC
+[Install]
+WantedBy=multi-user.target
+EOF
+  fi
+  if command -v systemctl >/dev/null 2>&1 \
+     && systemctl daemon-reload >/dev/null 2>&1 \
+     && systemctl enable --now "$name" >/dev/null 2>&1; then
+    ok "service '$name' enabled & started  (logs: journalctl -u $name -f)"
+    return
+  fi
+  info "systemd not usable here — start it manually (or in your own supervisor):"
+  echo "     $exec"
+}
+
+detect_ip(){
+  local ip; ip="$(curl -fsSL --max-time 8 https://api.ipify.org 2>/dev/null || true)"
+  [ -n "$ip" ] || ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  [ -n "$ip" ] || ip="YOUR_SERVER_IP"
+  printf '%s' "$ip"
+}
+
 install_panel(){
   ensure_go; fetch_src; build rahro-panel
   mkdir -p "$ETC"
   local cfg="$ETC/panel.json"
-  local ip; ip="$(curl -fsSL https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')"
+  local ip; ip="$(detect_ip)"
   if [ ! -f "$cfg" ]; then
     cat > "$cfg" <<EOF
 {
@@ -97,30 +132,24 @@ EOF
     ok "wrote $cfg"
   fi
 
-  local user="admin" pass; pass="$(head -c9 /dev/urandom | base64 | tr -d '/+=' | head -c12)"
-  "$PREFIX/rahro-panel" admin create -config "$cfg" -u "$user" -p "$pass" 2>/dev/null \
-    && ok "admin created" || info "admin already exists (skipping)"
+  local user="admin" pass created=0
+  pass="$(head -c9 /dev/urandom | base64 | tr -d '/+=' | head -c12)"
+  if "$PREFIX/rahro-panel" admin create -config "$cfg" -u "$user" -p "$pass" >/dev/null 2>&1; then
+    created=1
+  fi
 
-  cat > /etc/systemd/system/rahro-panel.service <<EOF
-[Unit]
-Description=Rahro Panel
-After=network.target
-[Service]
-ExecStart=$PREFIX/rahro-panel run -config $cfg
-Restart=always
-RestartSec=3
-WorkingDirectory=$ETC
-[Install]
-WantedBy=multi-user.target
-EOF
-  systemctl daemon-reload
-  systemctl enable --now rahro-panel >/dev/null 2>&1 || true
+  setup_service rahro-panel "$PREFIX/rahro-panel run -config $cfg"
 
   echo
-  ok "Rahro panel is up."
-  echo -e "   URL:      ${c_green}https://${ip}:2053${c_reset}  (self-signed cert — accept the browser warning)"
-  echo -e "   Login:    ${c_green}${user}${c_reset} / ${c_green}${pass}${c_reset}"
-  echo    "   Logs:     journalctl -u rahro-panel -f"
+  ok "Rahro panel installed."
+  echo -e "   URL:   ${c_green}https://${ip}:2053${c_reset}   (self-signed cert — accept the browser warning)"
+  if [ "$created" = "1" ]; then
+    echo -e "   Login: ${c_green}${user}${c_reset} / ${c_green}${pass}${c_reset}    ← save this now"
+  else
+    echo    "   Admin already existed. Reset its password with:"
+    echo    "     $PREFIX/rahro-panel admin passwd -config $cfg -u admin -p 'NEWPASS'"
+  fi
+  echo    "   Config: $cfg   (edit, then: systemctl restart rahro-panel)"
 }
 
 install_node(){
@@ -132,21 +161,10 @@ install_node(){
   info "enrolling node"
   ( cd "$ETC" && "$PREFIX/rahro-node" enroll "$code" "$@" -out "$ETC/node.json" ) || die "enrollment failed"
 
-  cat > /etc/systemd/system/rahro-node.service <<EOF
-[Unit]
-Description=Rahro Node ($role)
-After=network.target
-[Service]
-ExecStart=$PREFIX/rahro-node run -config $ETC/node.json
-Restart=always
-RestartSec=3
-WorkingDirectory=$ETC
-[Install]
-WantedBy=multi-user.target
-EOF
-  systemctl daemon-reload
-  systemctl enable --now rahro-node >/dev/null 2>&1 || true
-  ok "Rahro node ($role) enrolled and started. Logs: journalctl -u rahro-node -f"
+  setup_service rahro-node "$PREFIX/rahro-node run -config $ETC/node.json"
+  echo
+  ok "Rahro node ($role) enrolled."
+  echo    "   Config: $ETC/node.json"
 }
 
 case "${1:-panel}" in
