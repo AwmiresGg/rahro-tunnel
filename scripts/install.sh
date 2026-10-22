@@ -18,7 +18,7 @@ REPO="${RAHRO_REPO:-https://github.com/AwmiresGg/rahro-tunnel}"
 REF="${RAHRO_REF:-HEAD}"
 PREFIX="/usr/local/bin"
 ETC="/etc/rahro"
-GO_VERSION="1.26.0"
+GO_FALLBACK="go1.27.3"   # used only if go.dev/VERSION can't be queried
 
 c_green='\033[0;32m'; c_cyan='\033[0;36m'; c_red='\033[0;31m'; c_reset='\033[0m'
 info(){ echo -e "${c_cyan}==>${c_reset} $*"; }
@@ -35,13 +35,17 @@ esac
 
 ensure_go(){
   if command -v go >/dev/null 2>&1; then GO=go; return; fi
-  if [ -x /usr/local/go/bin/go ]; then GO=/usr/local/go/bin/go; return; fi
-  info "installing Go ${GO_VERSION}"
-  local tgz="go${GO_VERSION}.linux-${GOARCH}.tar.gz"
-  curl -fsSL "https://go.dev/dl/${tgz}" -o "/tmp/${tgz}" || die "download Go failed"
-  rm -rf /usr/local/go && tar -C /usr/local -xzf "/tmp/${tgz}"
+  if [ -x /usr/local/go/bin/go ]; then GO=/usr/local/go/bin/go; export PATH="/usr/local/go/bin:$PATH"; return; fi
+  # Use the current stable Go so the download always exists on the CDN.
+  local gv; gv="$(curl -fsSL 'https://go.dev/VERSION?m=text' 2>/dev/null | head -n1)"
+  case "$gv" in go*) ;; *) gv="$GO_FALLBACK";; esac
+  info "installing ${gv}"
+  local tgz="${gv}.linux-${GOARCH}.tar.gz"
+  curl -fsSL "https://go.dev/dl/${tgz}" -o "/tmp/${tgz}" || die "download Go failed (${tgz}); retry, or install Go manually from https://go.dev/dl/ and re-run"
+  rm -rf /usr/local/go && tar -C /usr/local -xzf "/tmp/${tgz}" || die "extract Go failed"
+  export PATH="/usr/local/go/bin:$PATH"
   GO=/usr/local/go/bin/go
-  ok "Go installed"
+  ok "Go installed (${gv})"
 }
 
 fetch_src(){
