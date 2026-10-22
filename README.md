@@ -67,9 +67,10 @@ sudo bash rahro-install.sh
 > Building from a clone works too (and `scripts/install.sh` detects the checkout
 > and builds from it): `git clone https://github.com/AwmiresGg/rahro-tunnel.git && cd rahro-tunnel && sudo bash scripts/install.sh`.
 
-It builds Rahro (installing Go if needed), writes `/etc/rahro/panel.json`,
-creates an admin, and starts the `rahro-panel` systemd service. At the end it
-prints your **panel URL** and **admin credentials**.
+It downloads a prebuilt binary from GitHub (no Go/compile needed; it only builds
+from source as a fallback), writes `/etc/rahro/panel.json`, creates an admin,
+and starts the `rahro-panel` service. At the end it prints your **panel URL**
+and **admin credentials**.
 
 Open the panel in a browser:
 
