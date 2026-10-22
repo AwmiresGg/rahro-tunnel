@@ -158,12 +158,29 @@ async function renderDash(){
   </div>
   <div class="card" style="display:flex;align-items:center;gap:12px">
     <div style="font-weight:600">Xray core</div> ${xstate}
+    <button class="btn-ghost" onclick="runDiag()">🩺 Diagnose connection</button>
     <button class="btn-ghost" style="margin-left:auto" onclick="xrayApply()">Apply / restart</button>
   </div>${xver?('<div class="card">'+xver+'</div>'):''}
+  <div id="diag"></div>
   ${sysCard}
   <div class="card">Manage users, inbounds (served by Xray), nodes/tunnels, and API tokens from the sidebar. Changes to inbounds or users apply to Xray automatically.</div>`;
 }
 async function xrayApply(){try{await api('POST','/api/xray/apply');toast('Xray reloaded');renderDash()}catch(e){toast(e.message)}}
+async function runDiag(){
+  const el=$('#diag'); el.innerHTML='<div class="card">Running checks…</div>';
+  let d; try{d=await api('GET','/api/diag')}catch(e){el.innerHTML='';return toast(e.message)}
+  const yn=v=>v?'<span class="badge b-ok">OK</span>':'<span class="badge b-bad">FAIL</span>';
+  let h='<div class="card"><div style="font-weight:600;margin-bottom:8px">Connection diagnostics</div>';
+  h+=`<div style="margin:4px 0">Xray installed ${yn(d.xray.installed)} · running ${yn(d.xray.running)}</div>`;
+  h+=`<div style="margin:4px 0">Link host: <span class="mono">${esc(d.public_host||'?')}</span></div>`;
+  (d.inbounds||[]).forEach(i=>{h+=`<div style="margin:4px 0">Inbound <b>${esc(i.tag)}</b> :${i.port} (${esc(i.security)}) — port listening ${yn(i.listening)}</div>`});
+  (d.reality_dests||[]).forEach(x=>{h+=`<div style="margin:4px 0">REALITY dest <span class="mono">${esc(x.dest)}</span> reachable ${yn(x.reachable)}</div>`});
+  if(!d.xray.running) h+='<div style="color:var(--warn);font-size:12px;margin-top:8px">Xray is not running — inbounds will not serve. If it says "downloading…", the server can\'t reach GitHub to fetch Xray.</div>';
+  const anyDown=(d.inbounds||[]).some(i=>!i.listening);
+  if(anyDown) h+='<div style="color:var(--warn);font-size:12px;margin-top:8px">A port is not listening. Check the inbound\'s port isn\'t already in use, and open it in the server/cloud firewall.</div>';
+  h+='<div style="color:var(--dim);font-size:11px;margin-top:8px">Note: if you use a domain behind Cloudflare, set the DNS record to <b>DNS-only (grey cloud)</b> — REALITY/TLS tunnels break when proxied (orange cloud).</div>';
+  h+='</div>'; el.innerHTML=h;
+}
 async function renderUsers(){
   const u=await api('GET','/api/users');
   let on={}; try{on=await api('GET','/api/onlines')}catch(e){}
