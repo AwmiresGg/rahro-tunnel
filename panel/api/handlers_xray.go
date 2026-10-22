@@ -61,6 +61,21 @@ func (s *Server) ApplyXrayErr() error {
 	return s.Xray.Apply(xray.GenerateConfig(inbounds, users))
 }
 
+// handleXrayLog returns the tail of Xray's runtime log (or access log with
+// ?access=1), so the admin can see exactly what happens when a client connects
+// — e.g. "REALITY: processed invalid connection" (key mismatch) vs an
+// "accepted ... email:" line (connected) vs nothing (never reached the server).
+func (s *Server) handleXrayLog(w http.ResponseWriter, r *http.Request) {
+	if s.Xray == nil {
+		httpError(w, http.StatusServiceUnavailable, "xray is not enabled")
+		return
+	}
+	access := r.URL.Query().Get("access") == "1"
+	writeJSON(w, http.StatusOK, map[string]string{
+		"log": s.Xray.TailLog(access, 60),
+	})
+}
+
 func (s *Server) handleXrayStatus(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]any{"enabled": s.Xray != nil}
 	if s.Xray != nil {

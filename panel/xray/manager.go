@@ -53,6 +53,25 @@ func (m *Manager) confPath() string { return filepath.Join(m.dir, "config.json")
 // which the panel tails to compute online clients and enforce IP limits.
 func (m *Manager) AccessLogPath() string { return filepath.Join(m.dir, "access.log") }
 
+// TailLog returns the last n lines of Xray's runtime log (xray.log, which
+// captures stdout/stderr including REALITY errors) or, when access is true, the
+// access log. Used by the panel's log viewer for diagnosing live connections.
+func (m *Manager) TailLog(access bool, n int) string {
+	path := filepath.Join(m.dir, "xray.log")
+	if access {
+		path = m.AccessLogPath()
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(strings.TrimRight(string(b), "\n"), "\n")
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return strings.Join(lines, "\n")
+}
+
 // ReadConfig returns the config.json Xray is currently running, for diagnostics
 // (e.g. detecting a stale on-disk config whose keys no longer match the DB).
 func (m *Manager) ReadConfig() ([]byte, error) { return os.ReadFile(m.confPath()) }

@@ -159,6 +159,7 @@ async function renderDash(){
   <div class="card" style="display:flex;align-items:center;gap:12px">
     <div style="font-weight:600">Xray core</div> ${xstate}
     <button class="btn-ghost" onclick="runDiag()">🩺 Diagnose connection</button>
+    <button class="btn-ghost" onclick="showXrayLog()">📜 Xray log</button>
     <button class="btn-ghost" style="margin-left:auto" onclick="xrayApply()">Apply / restart</button>
   </div>${xver?('<div class="card">'+xver+'</div>'):''}
   <div id="diag"></div>
@@ -166,6 +167,16 @@ async function renderDash(){
   <div class="card">Manage users, inbounds (served by Xray), nodes/tunnels, and API tokens from the sidebar. Changes to inbounds or users apply to Xray automatically.</div>`;
 }
 async function xrayApply(){try{const r=await api('POST','/api/xray/apply');toast(r.error?('Apply error: '+r.error):'Xray reloaded');renderDash()}catch(e){toast(e.message)}}
+async function showXrayLog(){
+  let e=null,a=null;
+  try{e=await api('GET','/api/xray/log')}catch(x){}
+  try{a=await api('GET','/api/xray/log?access=1')}catch(x){}
+  const box=s=>`<pre style="white-space:pre-wrap;word-break:break-all;background:#0b1120;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;max-height:240px;overflow:auto">${esc(s||'(empty)')}</pre>`;
+  openModal('Xray log (connect from your client, then reopen this)',
+    '<div style="font-size:12px;color:var(--dim);margin-bottom:6px">Error log (REALITY / startup):</div>'+box(e&&e.log)+
+    '<div style="font-size:12px;color:var(--dim);margin:10px 0 6px">Access log (accepted connections):</div>'+box(a&&a.log)+
+    '<div style="font-size:11px;color:var(--dim);margin-top:8px">Try connecting in v2rayNG now, then reopen this. “REALITY: processed invalid connection” = key mismatch (click Apply/restart). An “accepted … email:” line = it connected. Nothing new = the connection never reached the server (port/firewall).</div>');
+}
 async function runDiag(){
   const el=$('#diag'); el.innerHTML='<div class="card">Running checks…</div>';
   let d; try{d=await api('GET','/api/diag')}catch(e){el.innerHTML='';return toast(e.message)}
