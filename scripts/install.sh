@@ -83,6 +83,28 @@ build(){
   ok "installed $PREFIX/$1"
 }
 
+# try_prebuilt downloads a ready-made binary from GitHub (no Go, no compile).
+# This is the fast path and the only one that works where go.dev is blocked.
+try_prebuilt(){ # $1 = binary name
+  local name="$1"
+  local url="https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/${REF}/bin/linux-${GOARCH}/${name}"
+  info "downloading prebuilt ${name} (linux-${GOARCH})"
+  if curl -fsSL --max-time 180 "$url" -o "$PREFIX/$name" 2>/dev/null && [ -s "$PREFIX/$name" ]; then
+    chmod +x "$PREFIX/$name"
+    ok "installed prebuilt $PREFIX/$name"
+    return 0
+  fi
+  rm -f "$PREFIX/$name"
+  return 1
+}
+
+# provide installs a binary: prebuilt from GitHub first, else build from source.
+provide(){ # $1 = binary name
+  if try_prebuilt "$1"; then return; fi
+  info "prebuilt unavailable for linux-${GOARCH}; building from source"
+  ensure_go; fetch_src; build "$1"
+}
+
 # setup_service installs and starts a systemd unit, degrading gracefully when
 # systemd is unavailable (containers, minimal images). It never aborts.
 setup_service(){ # $1=service name  $2=ExecStart command
@@ -119,7 +141,7 @@ detect_ip(){
 }
 
 install_panel(){
-  ensure_go; fetch_src; build rahro-panel
+  provide rahro-panel
   mkdir -p "$ETC"
   local cfg="$ETC/panel.json"
   local ip; ip="$(detect_ip)"
@@ -163,7 +185,7 @@ install_node(){
   local role="$1"; shift
   local code="${1:-}"; shift || true
   [ -n "$code" ] || die "usage: install.sh $role <connection-code> -panel <url> [-insecure]"
-  ensure_go; fetch_src; build rahro-node
+  provide rahro-node
   mkdir -p "$ETC"
   info "enrolling node"
   ( cd "$ETC" && "$PREFIX/rahro-node" enroll "$code" "$@" -out "$ETC/node.json" ) || die "enrollment failed"
