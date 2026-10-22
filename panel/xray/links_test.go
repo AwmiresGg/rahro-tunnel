@@ -66,3 +66,32 @@ func TestShareLinkVMess(t *testing.T) {
 		t.Fatalf("vmess fields wrong: %+v", m)
 	}
 }
+
+func TestShareLinkRealityDerivesPbkFromPrivateKey(t *testing.T) {
+	// Stored publicKey is WRONG; the link must still advertise the pbk derived
+	// from the privateKey so it matches the server (the fix for
+	// "REALITY: received real certificate").
+	priv := "aIWp7PyQQv8XL63zus-NrIlVAZ6c_TzwRr_XhiRXdEY"
+	wantPbk := "f-M92m_mQgEO2U8e5XY6YdgIKxT8HHNfr30-YHkC6Q8"
+	in := &store.Inbound{
+		Tag: "vr", Protocol: store.ProtoVLESS, Port: 443,
+		Network: "tcp", Security: "reality", Enabled: true,
+		Settings: `{"privateKey":"` + priv + `","publicKey":"WRONGWRONGWRONGWRONGWRONGWRONGWRONGWRONG","shortIds":["ab"],"serverNames":["www.microsoft.com"]}`,
+	}
+	link := ShareLink(in, &store.User{UUID: "u1"}, "1.2.3.4")
+	if !strings.Contains(link, "pbk="+wantPbk) {
+		t.Fatalf("link should carry derived pbk %s, got:\n%s", wantPbk, link)
+	}
+	if strings.Contains(link, "WRONG") {
+		t.Fatalf("link must not use the wrong stored publicKey:\n%s", link)
+	}
+}
+
+func TestRealityPublicKey(t *testing.T) {
+	if got := RealityPublicKey("aIWp7PyQQv8XL63zus-NrIlVAZ6c_TzwRr_XhiRXdEY"); got != "f-M92m_mQgEO2U8e5XY6YdgIKxT8HHNfr30-YHkC6Q8" {
+		t.Fatalf("derive = %q", got)
+	}
+	if RealityPublicKey("not-base64!!") != "" {
+		t.Fatal("bad key should return empty")
+	}
+}

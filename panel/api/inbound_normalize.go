@@ -8,6 +8,7 @@ import (
 
 	"github.com/awmiresgg/rahro/core/crypto"
 	"github.com/awmiresgg/rahro/panel/store"
+	"github.com/awmiresgg/rahro/panel/xray"
 )
 
 // realityKeypair returns an X25519 keypair in Xray's base64 format, preferring
@@ -38,10 +39,16 @@ func (s *Server) normalizeInbound(in *store.Inbound) {
 	}
 	switch in.Security {
 	case "reality":
-		if strOrEmpty(extra["privateKey"]) == "" || strOrEmpty(extra["publicKey"]) == "" {
+		if strOrEmpty(extra["privateKey"]) == "" {
 			if p, q, err := s.realityKeypair(); err == nil {
 				extra["privateKey"], extra["publicKey"] = p, q
 			}
+		}
+		// Always keep publicKey derived from privateKey, so a stored/pasted
+		// publicKey can never disagree with the server's key (the cause of
+		// "REALITY: received real certificate" auth failures).
+		if pk := xray.RealityPublicKey(strOrEmpty(extra["privateKey"])); pk != "" {
+			extra["publicKey"] = pk
 		}
 		if firstStr(extra["serverNames"]) == "" {
 			sni := strOrEmpty(extra["sni"])

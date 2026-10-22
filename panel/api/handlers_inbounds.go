@@ -1,6 +1,8 @@
 package api
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/awmiresgg/rahro/panel/store"
@@ -77,10 +79,19 @@ func (s *Server) handleUpdateInbound(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusNotFound, "not found")
 		return
 	}
+	// Preserve the enabled state unless the caller sent it explicitly, so
+	// editing an inbound's settings never silently disables it.
+	raw := map[string]json.RawMessage{}
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	r.Body.Close()
+	_ = json.Unmarshal(body, &raw)
 	var in store.Inbound
-	if err := readJSON(r, &in); err != nil {
+	if err := json.Unmarshal(body, &in); err != nil {
 		httpError(w, http.StatusBadRequest, "bad request")
 		return
+	}
+	if _, ok := raw["enabled"]; !ok {
+		in.Enabled = existing.Enabled
 	}
 	in.ID = existing.ID
 	in.CreatedAt = existing.CreatedAt

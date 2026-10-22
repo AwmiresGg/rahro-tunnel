@@ -6,8 +6,24 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/awmiresgg/rahro/core/crypto"
 	"github.com/awmiresgg/rahro/panel/store"
 )
+
+// RealityPublicKey derives the REALITY public key (pbk) from the inbound's
+// private key, so the client link's pbk is guaranteed to match the server's
+// running config even if a stored publicKey was wrong or stale. Returns "" if
+// the private key can't be parsed.
+func RealityPublicKey(priv string) string {
+	for _, enc := range []*base64.Encoding{base64.RawURLEncoding, base64.StdEncoding, base64.URLEncoding, base64.RawStdEncoding} {
+		if b, err := enc.DecodeString(priv); err == nil && len(b) == 32 {
+			if kp, err := crypto.PrivateKeyFromBytes(b); err == nil {
+				return base64.RawURLEncoding.EncodeToString(kp.PublicBytes())
+			}
+		}
+	}
+	return ""
+}
 
 // ShareLink builds a client share URI (vless://, vmess://, trojan://, ss://)
 // for a user on an inbound, reachable at host. Returns "" for unknown
@@ -56,8 +72,14 @@ func streamQuery(in *store.Inbound, extra map[string]any) url.Values {
 			q.Set("fp", v)
 		}
 	case "reality":
-		if v := str(extra["publicKey"], ""); v != "" {
-			q.Set("pbk", v)
+		// Derive pbk from the private key so it always matches the server; fall
+		// back to a stored publicKey only if derivation fails.
+		pbk := RealityPublicKey(str(extra["privateKey"], ""))
+		if pbk == "" {
+			pbk = str(extra["publicKey"], "")
+		}
+		if pbk != "" {
+			q.Set("pbk", pbk)
 		}
 		if v := firstString(extra["shortIds"]); v != "" {
 			q.Set("sid", v)
