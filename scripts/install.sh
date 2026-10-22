@@ -123,11 +123,13 @@ WorkingDirectory=$ETC
 WantedBy=multi-user.target
 EOF
   fi
-  if command -v systemctl >/dev/null 2>&1 \
-     && systemctl daemon-reload >/dev/null 2>&1 \
-     && systemctl enable --now "$name" >/dev/null 2>&1; then
-    ok "service '$name' enabled & started  (logs: journalctl -u $name -f)"
-    return
+  if command -v systemctl >/dev/null 2>&1 && systemctl daemon-reload >/dev/null 2>&1; then
+    systemctl enable "$name" >/dev/null 2>&1
+    # restart (not just --now) so re-running the installer applies binary updates
+    if systemctl restart "$name" >/dev/null 2>&1; then
+      ok "service '$name' (re)started  (logs: journalctl -u $name -f)"
+      return
+    fi
   fi
   info "systemd not usable here — start it manually (or in your own supervisor):"
   echo "     $exec"
