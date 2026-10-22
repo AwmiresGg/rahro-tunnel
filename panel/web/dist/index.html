@@ -237,7 +237,7 @@ async function showLinks(id){
    </div>`;
   let html=item('Subscription (all configs)',d.sub);
   html+=(d.links||[]).map(l=>item(l.tag+' · '+l.protocol,l.link)).join('');
-  if(!d.links||!d.links.length) html+='<div style="color:var(--dim)">No enabled inbounds are assigned to this user yet — add one in the Inbounds tab or assign this user to an inbound.</div>';
+  if(!d.links||!d.links.length) html+='<div style="color:var(--warn);font-size:13px;line-height:1.5">⚠ '+esc(d.reason||'No configs for this user.')+'</div>';
   openModal('Configs & QR codes',html);
 }
 function copyText(btn,enc){const t=decodeURIComponent(enc);navigator.clipboard?.writeText(t);const o=btn.textContent;btn.textContent='✓ copied';setTimeout(()=>btn.textContent=o,1200)}

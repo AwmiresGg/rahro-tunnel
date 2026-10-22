@@ -25,7 +25,11 @@ func (s *Server) handleUserLinks(w http.ResponseWriter, r *http.Request) {
 	host := s.hostForRequest(r)
 	inbounds, _ := s.Store.ListInbounds()
 	links := []map[string]string{}
+	enabledCount := 0
 	for _, in := range inbounds {
+		if in.Enabled {
+			enabledCount++
+		}
 		if !in.Enabled || !u.ServesInbound(in.Tag) {
 			continue
 		}
@@ -45,10 +49,22 @@ func (s *Server) handleUserLinks(w http.ResponseWriter, r *http.Request) {
 	if !usableHost(s.hostForRequest(r)) { // nothing better available
 		sub = s.subLink(u)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"sub":   sub,
-		"links": links,
-	})
+	resp := map[string]any{"sub": sub, "links": links}
+	// When there are no links, explain why so the admin isn't left guessing.
+	if len(links) == 0 {
+		switch {
+		case len(inbounds) == 0:
+			resp["reason"] = "No inbounds exist yet. Create one in the Inbounds tab."
+		case enabledCount == 0:
+			resp["reason"] = "No inbounds are enabled. Enable an inbound in the Inbounds tab."
+		case len(u.Inbounds()) > 0:
+			resp["reason"] = "This user is assigned to inbound(s) " + u.InboundTags +
+				" but none match an enabled inbound. Re-assign the user, or clear the assignment to use all inbounds."
+		default:
+			resp["reason"] = "No share links could be built for the enabled inbounds."
+		}
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // handleQR renders the ?text= parameter as a PNG QR code. Generated locally
