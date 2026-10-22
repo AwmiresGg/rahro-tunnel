@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/awmiresgg/rahro/panel/api"
 	"github.com/awmiresgg/rahro/panel/store"
 	"github.com/awmiresgg/rahro/panel/web"
+	"github.com/awmiresgg/rahro/panel/xray"
 )
 
 // Run starts the panel using the given store and config, blocking until the
@@ -29,6 +31,24 @@ func Run(st *store.Store, cfg *config.PanelConfig, log *slog.Logger) error {
 	}
 	publicBase := derivePublicURL(cfg)
 	apiSrv := api.New(st, log, publicBase)
+
+	// Managed Xray-core: download in the background, then serve the configured
+	// inbounds. Failure (e.g. no network to GitHub) leaves the panel fully
+	// usable; inbounds just won't serve until Xray is installed.
+	xrayDir := "xray"
+	if cfg.DBPath != "" {
+		xrayDir = filepath.Join(filepath.Dir(cfg.DBPath), "xray")
+	}
+	mgr := xray.NewManager(xrayDir, log)
+	apiSrv.Xray = mgr
+	go func() {
+		if err := mgr.EnsureBinary(); err != nil {
+			log.Warn("xray-core not installed; inbounds will not serve until it is", "err", err)
+			return
+		}
+		apiSrv.ApplyXray()
+	}()
+
 	apiMux := apiSrv.Routes()
 
 	root := http.NewServeMux()

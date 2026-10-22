@@ -120,14 +120,25 @@ const when=t=>t?new Date(t*1000).toISOString().slice(0,10):'—';
 
 async function renderDash(){
   const s=await api('GET','/api/stats');
+  let xr={}; try{xr=await api('GET','/api/xray/status')}catch(e){}
+  const xstate = !xr.enabled?'<span class="badge b-bad">off</span>'
+    : xr.running?'<span class="badge b-ok">running</span>'
+    : xr.installed?'<span class="badge b-warn">installed, idle</span>'
+    : '<span class="badge b-warn">downloading…</span>';
+  const xver = xr.version?('<div class="mono" style="margin-top:6px">'+esc(xr.version)+'</div>'):'';
   $('#content').innerHTML=`<div class="grid">
     <div class="stat"><div style="color:var(--dim)">Users</div><div class="n">${s.users}</div></div>
     <div class="stat"><div style="color:var(--dim)">Active users</div><div class="n">${s.active_users}</div></div>
     <div class="stat"><div style="color:var(--dim)">Nodes</div><div class="n">${s.nodes}</div></div>
     <div class="stat"><div style="color:var(--dim)">Nodes enabled</div><div class="n">${s.nodes_enabled}</div></div>
   </div>
-  <div class="card">Welcome to the Rahro panel. Use the sidebar to manage users, nodes/tunnels, and API tokens for your Telegram sales bot.</div>`;
+  <div class="card" style="display:flex;align-items:center;gap:12px">
+    <div style="font-weight:600">Xray core</div> ${xstate}
+    <button class="btn-ghost" style="margin-left:auto" onclick="xrayApply()">Apply / restart</button>
+  </div>${xver?('<div class="card">'+xver+'</div>'):''}
+  <div class="card">Manage users, inbounds (served by Xray), nodes/tunnels, and API tokens from the sidebar. Changes to inbounds or users apply to Xray automatically.</div>`;
 }
+async function xrayApply(){try{await api('POST','/api/xray/apply');toast('Xray reloaded');renderDash()}catch(e){toast(e.message)}}
 async function renderUsers(){
   const u=await api('GET','/api/users');
   let rows=u.map(x=>`<tr>

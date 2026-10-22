@@ -14,6 +14,7 @@ import (
 
 	"github.com/awmiresgg/rahro/panel/auth"
 	"github.com/awmiresgg/rahro/panel/store"
+	"github.com/awmiresgg/rahro/panel/xray"
 )
 
 // Server holds the API dependencies.
@@ -23,6 +24,9 @@ type Server struct {
 	// PublicBase is the externally-reachable panel base URL (used to build
 	// subscription links), e.g. "https://panel.example.com:2053".
 	PublicBase string
+	// Xray, when set, is the managed Xray-core process driven by the panel's
+	// inbounds and users. nil disables Xray features gracefully.
+	Xray *xray.Manager
 
 	mu       sync.Mutex
 	sessions map[string]session // cookie token -> session
@@ -82,6 +86,10 @@ func (s *Server) Routes() *http.ServeMux {
 	// Node control plane (node-secret authenticated in-handler).
 	mux.HandleFunc("POST /nodeapi/enroll", s.handleNodeEnroll)
 	mux.HandleFunc("POST /nodeapi/config", s.handleNodeConfig)
+
+	// Xray core status / apply.
+	mux.HandleFunc("GET /api/xray/status", s.admin(s.handleXrayStatus))
+	mux.HandleFunc("POST /api/xray/apply", s.admin(s.handleXrayApply))
 
 	// Public subscription.
 	mux.HandleFunc("GET /sub/{token}", s.handleSubscription)

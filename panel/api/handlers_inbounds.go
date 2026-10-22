@@ -39,6 +39,7 @@ func (s *Server) handleCreateInbound(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusConflict, err.Error())
 		return
 	}
+	s.ApplyXray()
 	writeJSON(w, http.StatusCreated, created)
 }
 
@@ -82,6 +83,7 @@ func (s *Server) handleUpdateInbound(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusConflict, err.Error())
 		return
 	}
+	s.ApplyXray()
 	writeJSON(w, http.StatusOK, &in)
 }
 
@@ -95,6 +97,7 @@ func (s *Server) handleDeleteInbound(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusNotFound, "not found")
 		return
 	}
+	s.ApplyXray()
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 

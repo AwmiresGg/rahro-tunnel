@@ -47,6 +47,7 @@ func (s *Server) handleBotCreateUser(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusConflict, err.Error())
 		return
 	}
+	s.ApplyXray()
 	writeJSON(w, http.StatusCreated, s.userResponse(created))
 }
 
@@ -94,6 +95,7 @@ func (s *Server) handleBotRenewUser(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	s.ApplyXray()
 	writeJSON(w, http.StatusOK, s.userResponse(u))
 }
 

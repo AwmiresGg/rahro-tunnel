@@ -55,6 +55,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusConflict, err.Error())
 		return
 	}
+	s.ApplyXray()
 	writeJSON(w, http.StatusCreated, created)
 }
 
@@ -115,6 +116,7 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	s.ApplyXray()
 	writeJSON(w, http.StatusOK, u)
 }
 
@@ -128,6 +130,7 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusNotFound, "not found")
 		return
 	}
+	s.ApplyXray()
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
