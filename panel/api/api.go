@@ -67,6 +67,8 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/system", s.admin(s.handleSystem))
 	mux.HandleFunc("GET /api/onlines", s.admin(s.handleOnlines))
 	mux.HandleFunc("GET /api/backup", s.admin(s.handleBackup))
+	mux.HandleFunc("GET /api/telegram", s.admin(s.handleGetTelegram))
+	mux.HandleFunc("POST /api/telegram", s.admin(s.handleSetTelegram))
 
 	// Users.
 	mux.HandleFunc("GET /api/users", s.admin(s.handleListUsers))

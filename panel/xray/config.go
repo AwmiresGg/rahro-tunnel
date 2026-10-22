@@ -165,8 +165,10 @@ func buildStream(network, security string, extra map[string]any) map[string]any 
 		}
 		ss["tlsSettings"] = tls
 	case "reality":
+		// Only server-side REALITY fields here; fingerprint/publicKey/spiderX are
+		// client-side and belong in the share link, not the inbound.
 		r := map[string]any{"show": false}
-		copyKeys(r, extra, "dest", "serverNames", "privateKey", "shortIds", "xver", "fingerprint", "spiderX")
+		copyKeys(r, extra, "dest", "serverNames", "privateKey", "shortIds", "xver")
 		ss["realitySettings"] = r
 	}
 

@@ -22,7 +22,7 @@ func (s *Server) handleUserLinks(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusNotFound, "not found")
 		return
 	}
-	host := s.publicHost()
+	host := s.hostForRequest(r)
 	inbounds, _ := s.Store.ListInbounds()
 	links := []map[string]string{}
 	for _, in := range inbounds {
@@ -35,8 +35,18 @@ func (s *Server) handleUserLinks(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
+	// Build the subscription URL from the address the admin actually used, so it
+	// is reachable even if public_url was never set correctly.
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	sub := scheme + "://" + r.Host + "/sub/" + u.SubToken
+	if !usableHost(s.hostForRequest(r)) { // nothing better available
+		sub = s.subLink(u)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"sub":   s.subLink(u),
+		"sub":   sub,
 		"links": links,
 	})
 }

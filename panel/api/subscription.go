@@ -24,10 +24,38 @@ func (s *Server) publicHost() string {
 	return hostOnly(s.PublicBase)
 }
 
+// usableHost reports whether a host is a real reachable address (not a
+// placeholder, loopback, or wildcard we must not put in a client link).
+func usableHost(h string) bool {
+	switch strings.ToLower(h) {
+	case "", "your_server_ip", "127.0.0.1", "localhost", "0.0.0.0", "::1":
+		return false
+	}
+	return true
+}
+
+// hostForRequest returns the best host to embed in client links: the configured
+// public host when it is real, otherwise the host the admin actually reached
+// the panel on (from the request). This makes links work even when public_url
+// was never set correctly (e.g. IP auto-detection failed at install time).
+func (s *Server) hostForRequest(r *http.Request) string {
+	if h := s.publicHost(); usableHost(h) {
+		return h
+	}
+	h := r.Host
+	if i := strings.LastIndex(h, ":"); i > 0 && !strings.Contains(h[i:], "]") {
+		h = h[:i]
+	}
+	h = strings.Trim(h, "[]")
+	if usableHost(h) {
+		return h
+	}
+	return s.publicHost() // nothing better; return whatever we have
+}
+
 // inboundLinks builds client share links for this user across the enabled,
-// Xray-served inbounds on the panel's own host.
-func (s *Server) inboundLinks(u *store.User) []string {
-	host := s.publicHost()
+// Xray-served inbounds on the given host.
+func (s *Server) inboundLinks(u *store.User, host string) []string {
 	inbounds, _ := s.Store.ListInbounds()
 	var links []string
 	for _, in := range inbounds {
@@ -88,7 +116,7 @@ func (s *Server) handleSubscription(w http.ResponseWriter, r *http.Request) {
 
 	nodes, _ := s.Store.ListNodes()
 	// Real, Xray-served inbound links first, then multi-location node links.
-	links := append(s.inboundLinks(u), buildConfigs(u, nodes)...)
+	links := append(s.inboundLinks(u, s.hostForRequest(r)), buildConfigs(u, nodes)...)
 	body := base64.StdEncoding.EncodeToString([]byte(strings.Join(links, "\n")))
 
 	// Standard subscription-userinfo header so clients can show quota/expiry.

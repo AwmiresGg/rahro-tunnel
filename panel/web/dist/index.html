@@ -330,10 +330,33 @@ function renderSettings(){
       <div id="serr" style="font-size:12px;margin-top:10px"></div>
     </div>
     <div class="card" style="max-width:520px;margin-top:14px">
+      <div style="font-size:14px;font-weight:600;margin-bottom:4px">Telegram bot</div>
+      <div style="color:var(--dim);font-size:12px;margin-bottom:14px">Manage users and get quota/expiry alerts from Telegram. Create a bot with <b>@BotFather</b> to get a token, then message your bot <b>/id</b> to learn your chat ID and put it below. <span id="tgstate"></span></div>
+      <label>Bot token</label><input id="tgtok" class="in" placeholder="leave blank to keep current, or 123456:ABC..." style="margin-bottom:12px">
+      <label>Admin chat IDs (comma-separated)</label><input id="tgadm" class="in" placeholder="111111111,222222222" style="margin-bottom:14px">
+      <button class="btn" onclick="saveTelegram()">Save Telegram settings</button>
+      <div id="tgerr" style="font-size:12px;margin-top:10px"></div>
+    </div>
+    <div class="card" style="max-width:520px;margin-top:14px">
       <div style="font-size:14px;font-weight:600;margin-bottom:4px">Backup &amp; data</div>
       <div style="color:var(--dim);font-size:12px;margin-bottom:14px">Download a complete snapshot of the panel database (users, inbounds, nodes, tokens). Keep it somewhere safe; to restore, replace the panel's .db file with it.</div>
       <button class="btn" onclick="downloadBackup()">⬇ Download backup</button>
     </div>`;
+  loadTelegram();
+}
+async function loadTelegram(){
+  try{const t=await api('GET','/api/telegram');
+    $('#tgstate').innerHTML = t.configured?('Bot configured (token '+esc(t.token_hint)+'). ✅'):'No token set yet.';
+    $('#tgadm').value=t.admin_ids||'';
+  }catch(e){}
+}
+async function saveTelegram(){
+  const body={admin_ids:$('#tgadm').value};
+  const tok=$('#tgtok').value.trim(); if(tok) body.token=tok;
+  try{await api('POST','/api/telegram',body);
+    $('#tgerr').style.color='var(--ok)';$('#tgerr').textContent='Saved. The bot picks up changes within ~15s.';
+    $('#tgtok').value='';loadTelegram();
+  }catch(e){$('#tgerr').style.color='var(--bad)';$('#tgerr').textContent=e.message}
 }
 async function downloadBackup(){
   try{

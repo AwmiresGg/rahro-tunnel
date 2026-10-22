@@ -20,6 +20,7 @@ import (
 	"github.com/awmiresgg/rahro/internal/config"
 	"github.com/awmiresgg/rahro/panel/api"
 	"github.com/awmiresgg/rahro/panel/store"
+	"github.com/awmiresgg/rahro/panel/tgbot"
 	"github.com/awmiresgg/rahro/panel/web"
 	"github.com/awmiresgg/rahro/panel/xray"
 )
@@ -53,6 +54,8 @@ func Run(st *store.Store, cfg *config.PanelConfig, log *slog.Logger) error {
 	go apiSrv.RunTrafficLoop(context.Background(), 45*time.Second)
 	// Tail the access log for online clients and IP-limit enforcement.
 	go apiSrv.RunOnlineLoop(context.Background(), 10*time.Second)
+	// Built-in Telegram bot: idles until a token is configured in settings.
+	go tgbot.New(st, publicBase, apiSrv.ApplyXray, log).Run(context.Background())
 
 	apiMux := apiSrv.Routes()
 
