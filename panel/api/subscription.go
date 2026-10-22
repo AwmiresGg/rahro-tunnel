@@ -8,11 +8,37 @@ import (
 	"strings"
 
 	"github.com/awmiresgg/rahro/panel/store"
+	"github.com/awmiresgg/rahro/panel/xray"
 )
 
 // subLink returns the user's subscription URL.
 func (s *Server) subLink(u *store.User) string {
 	return strings.TrimRight(s.PublicBase, "/") + "/sub/" + u.SubToken
+}
+
+// publicHost extracts the panel's hostname/IP from PublicBase.
+func (s *Server) publicHost() string {
+	if u, err := url.Parse(s.PublicBase); err == nil && u.Hostname() != "" {
+		return u.Hostname()
+	}
+	return hostOnly(s.PublicBase)
+}
+
+// inboundLinks builds client share links for this user across the enabled,
+// Xray-served inbounds on the panel's own host.
+func (s *Server) inboundLinks(u *store.User) []string {
+	host := s.publicHost()
+	inbounds, _ := s.Store.ListInbounds()
+	var links []string
+	for _, in := range inbounds {
+		if !in.Enabled {
+			continue
+		}
+		if l := xray.ShareLink(in, u, host); l != "" {
+			links = append(links, l)
+		}
+	}
+	return links
 }
 
 // buildConfigs produces one share link per enabled, user-serving node, so a
@@ -61,7 +87,8 @@ func (s *Server) handleSubscription(w http.ResponseWriter, r *http.Request) {
 	}
 
 	nodes, _ := s.Store.ListNodes()
-	links := buildConfigs(u, nodes)
+	// Real, Xray-served inbound links first, then multi-location node links.
+	links := append(s.inboundLinks(u), buildConfigs(u, nodes)...)
 	body := base64.StdEncoding.EncodeToString([]byte(strings.Join(links, "\n")))
 
 	// Standard subscription-userinfo header so clients can show quota/expiry.

@@ -1,10 +1,27 @@
 package api
 
 import (
+	"encoding/base64"
 	"net/http"
 
+	"github.com/awmiresgg/rahro/core/crypto"
 	"github.com/awmiresgg/rahro/panel/xray"
 )
+
+// handleRealityKeys generates an X25519 keypair in Xray's base64-rawURL format.
+// The private key goes in the inbound's reality settings; the public key goes
+// into client share links (pbk=).
+func (s *Server) handleRealityKeys(w http.ResponseWriter, r *http.Request) {
+	kp, err := crypto.GenerateKeyPair()
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"privateKey": base64.RawURLEncoding.EncodeToString(kp.PrivateBytes()),
+		"publicKey":  base64.RawURLEncoding.EncodeToString(kp.PublicBytes()),
+	})
+}
 
 // ApplyXray regenerates the Xray config from the current inbounds+users and
 // (re)starts the core. It is a no-op when Xray is not configured. Errors are

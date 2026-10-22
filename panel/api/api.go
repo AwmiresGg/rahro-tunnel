@@ -90,6 +90,7 @@ func (s *Server) Routes() *http.ServeMux {
 	// Xray core status / apply.
 	mux.HandleFunc("GET /api/xray/status", s.admin(s.handleXrayStatus))
 	mux.HandleFunc("POST /api/xray/apply", s.admin(s.handleXrayApply))
+	mux.HandleFunc("POST /api/xray/reality-keys", s.admin(s.handleRealityKeys))
 
 	// Public subscription.
 	mux.HandleFunc("GET /sub/{token}", s.handleSubscription)

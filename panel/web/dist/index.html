@@ -179,13 +179,30 @@ async function renderInbounds(){
       <div><label>Network</label><select id="inet" class="in"><option>tcp</option><option>ws</option><option>grpc</option><option>http</option><option>quic</option></select></div>
       <div><label>Security</label><select id="isec" class="in"><option>reality</option><option>tls</option><option>none</option></select></div>
       <div style="flex:0"><button class="btn" onclick="addInbound()">+ Add inbound</button></div>
-    </div><div style="font-size:11px;color:var(--dim);margin-top:8px">Active users are offered as clients on every enabled inbound. Xray-core serving is the next milestone; these definitions already drive its config.</div></div>
+    </div>
+    <div style="margin-top:10px"><label>Settings (JSON, optional — sni, publicKey, shortIds, serverNames, path, host, serviceName, flow, method)</label>
+      <textarea id="iset" class="in" rows="2" placeholder='{"sni":"www.microsoft.com","publicKey":"...","shortIds":["ab"],"serverNames":["www.microsoft.com"],"flow":"xtls-rprx-vision"}'></textarea>
+      <button class="btn-ghost" style="margin-top:8px" onclick="genReality()">🔑 Generate REALITY keys</button>
+      <span id="rkeys" class="mono" style="margin-left:10px"></span></div>
+    <div style="font-size:11px;color:var(--dim);margin-top:8px">Active users are offered as clients on every enabled inbound. Xray serves these; users get working share links in their subscription automatically.</div></div>
     <table><thead><tr><th>Tag</th><th>Protocol</th><th>Port</th><th>Transport</th><th>Status</th><th></th></tr></thead>
     <tbody>${rows||'<tr><td colspan=6 style="color:var(--dim)">No inbounds yet</td></tr>'}</tbody></table>`;
 }
 async function addInbound(){try{
-  await api('POST','/api/inbounds',{tag:$('#itag').value,protocol:$('#iproto').value,port:+$('#iport').value,network:$('#inet').value,security:$('#isec').value});
+  const body={tag:$('#itag').value,protocol:$('#iproto').value,port:+$('#iport').value,network:$('#inet').value,security:$('#isec').value};
+  const st=$('#iset').value.trim(); if(st){try{JSON.parse(st)}catch(e){return toast('Settings is not valid JSON')} body.settings=st;}
+  await api('POST','/api/inbounds',body);
   renderInbounds();toast('Inbound created');
+}catch(e){toast(e.message)}}
+async function genReality(){try{
+  const k=await api('POST','/api/xray/reality-keys');
+  $('#rkeys').innerHTML='priv: '+k.privateKey+' &nbsp; pub(pbk): '+k.publicKey;
+  const cur=$('#iset').value.trim(); let o={}; if(cur){try{o=JSON.parse(cur)}catch(e){}}
+  o.privateKey=k.privateKey; o.publicKey=k.publicKey;
+  if(!o.shortIds)o.shortIds=[Math.random().toString(16).slice(2,10)];
+  if(!o.serverNames)o.serverNames=['www.microsoft.com']; if(!o.dest)o.dest='www.microsoft.com:443';
+  $('#iset').value=JSON.stringify(o);
+  toast('Reality keys generated and filled into settings');
 }catch(e){toast(e.message)}}
 async function delInbound(id){if(!confirm('Delete inbound?'))return;await api('DELETE','/api/inbounds/'+id);renderInbounds()}
 
