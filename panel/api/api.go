@@ -32,6 +32,8 @@ type Server struct {
 	sessions   map[string]session // cookie token -> session
 	lastActive map[int64]bool     // user IDs in the currently-applied Xray config
 	logins     map[string]*loginAttempts
+	online     *onlineTracker // recent per-user source IPs (from access.log)
+	ipStrikes  map[int64]int  // consecutive IP-limit violations per user id
 }
 
 type session struct {
@@ -48,7 +50,8 @@ func New(st *store.Store, log *slog.Logger, publicBase string) *Server {
 		log = slog.New(slog.DiscardHandler)
 	}
 	return &Server{Store: st, Log: log, PublicBase: publicBase,
-		sessions: map[string]session{}, logins: map[string]*loginAttempts{}}
+		sessions: map[string]session{}, logins: map[string]*loginAttempts{},
+		online: newOnlineTracker(), ipStrikes: map[int64]int{}}
 }
 
 // Routes registers all API routes on a new mux and returns it.
@@ -61,6 +64,8 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/me", s.admin(s.handleMe))
 	mux.HandleFunc("POST /api/account", s.admin(s.handleChangeAccount))
 	mux.HandleFunc("GET /api/stats", s.admin(s.handleStats))
+	mux.HandleFunc("GET /api/system", s.admin(s.handleSystem))
+	mux.HandleFunc("GET /api/onlines", s.admin(s.handleOnlines))
 	mux.HandleFunc("GET /api/backup", s.admin(s.handleBackup))
 
 	// Users.
@@ -69,6 +74,7 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/users/{id}", s.admin(s.handleGetUser))
 	mux.HandleFunc("PATCH /api/users/{id}", s.admin(s.handleUpdateUser))
 	mux.HandleFunc("DELETE /api/users/{id}", s.admin(s.handleDeleteUser))
+	mux.HandleFunc("POST /api/users/{id}/reset", s.admin(s.handleResetUser))
 
 	// Inbounds.
 	mux.HandleFunc("GET /api/inbounds", s.admin(s.handleListInbounds))

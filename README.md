@@ -171,10 +171,13 @@ config from inbounds+users, reload on change), inbounds (VLESS/VMess/Trojan/
 Shadowsocks over tcp/ws/grpc/http/quic with none/tls/reality), REALITY key
 generation, working client share links & subscriptions, **real per-user traffic
 metering via Xray's stats API with automatic quota/expiry enforcement**,
-multi-location nodes, the Iran tunnel-relay data path, admin account change,
-**admin login brute-force lockout** and security headers (HSTS under TLS),
-**one-click database backup** (panel Settings tab or `GET /botapi/backup`), the
-`rahro` terminal menu, the Telegram bot API, and the DPI-resistant Rahro
+multi-location nodes, the Iran tunnel-relay data path, **a server-status
+dashboard** (CPU/RAM/disk/swap/uptime/load), **online clients with per-user
+source IPs and enforced IP limits**, **per-user traffic reset and auto
+reset-cycles**, admin account change, **admin login brute-force lockout** and
+security headers (HSTS under TLS), **one-click database backup** (panel Settings
+tab or `GET /botapi/backup`), the `rahro` terminal menu, the Telegram bot API,
+and the DPI-resistant Rahro
 transport (TLS with a browser uTLS fingerprint, REALITY-style probe → decoy
 fallback, frame padding, WebSocket transport). Verified end-to-end against the
 real Xray-core binary. All packages pass `go test`; concurrency-sensitive ones

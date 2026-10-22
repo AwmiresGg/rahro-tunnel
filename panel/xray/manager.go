@@ -49,6 +49,10 @@ func NewManager(dir string, log *slog.Logger) *Manager {
 func (m *Manager) binPath() string  { return filepath.Join(m.dir, "xray") }
 func (m *Manager) confPath() string { return filepath.Join(m.dir, "config.json") }
 
+// AccessLogPath is where Xray writes its access log (source IPs + user emails),
+// which the panel tails to compute online clients and enforce IP limits.
+func (m *Manager) AccessLogPath() string { return filepath.Join(m.dir, "access.log") }
+
 // Installed reports whether the Xray binary is present.
 func (m *Manager) Installed() bool {
 	st, err := os.Stat(m.binPath())

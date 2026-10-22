@@ -47,15 +47,24 @@ func (s *Server) pollTraffic() {
 	if err != nil {
 		return
 	}
+	now := time.Now().Unix()
 	for _, u := range users {
 		if add := traf[u.Username]; add > 0 {
 			if err := s.Store.AddUsage(u.ID, add); err == nil {
 				u.UsedBytes += add // keep in-memory copy current for activeSet
 			}
 		}
+		// Auto reset-cycle: zero usage every reset_days.
+		if u.ResetDays > 0 && u.LastReset > 0 &&
+			now-u.LastReset >= int64(u.ResetDays)*86400 {
+			if err := s.Store.ResetUsage(u.ID); err == nil {
+				u.UsedBytes = 0
+				u.LastReset = now
+			}
+		}
 	}
-	// If the active membership changed (someone hit quota or expired, even with
-	// no new traffic), reapply so Xray drops them.
+	// If the active membership changed (someone hit quota or expired, or a reset
+	// re-activated them), reapply so Xray updates its client set.
 	if !sameSet(activeSet(users), s.lastActiveSet()) {
 		s.ApplyXray()
 	}

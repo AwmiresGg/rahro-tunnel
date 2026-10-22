@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -102,6 +103,18 @@ CREATE TABLE IF NOT EXISTS inbounds (
 `
 	if _, err := s.db.Exec(schema); err != nil {
 		return fmt.Errorf("store: migrate: %w", err)
+	}
+	// Additive column migrations for databases created by older versions.
+	// SQLite has no "ADD COLUMN IF NOT EXISTS"; a duplicate-column error means
+	// the column already exists, which is fine.
+	for _, stmt := range []string{
+		`ALTER TABLE users ADD COLUMN ip_limit INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE users ADD COLUMN reset_days INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE users ADD COLUMN last_reset INTEGER NOT NULL DEFAULT 0`,
+	} {
+		if _, err := s.db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("store: migrate alter: %w", err)
+		}
 	}
 	return nil
 }

@@ -15,6 +15,9 @@ type User struct {
 	UsedBytes  int64  `json:"used_bytes"`
 	ExpiresAt  int64  `json:"expires_at"` // unix; 0 = never
 	Enabled    bool   `json:"enabled"`
+	IPLimit    int    `json:"ip_limit"`   // max concurrent source IPs; 0 = unlimited
+	ResetDays  int    `json:"reset_days"` // auto-reset used traffic every N days; 0 = off
+	LastReset  int64  `json:"last_reset"` // unix of last traffic reset
 	CreatedAt  int64  `json:"created_at"`
 }
 
@@ -35,10 +38,14 @@ func (u *User) Active() bool {
 // CreateUser inserts a new user.
 func (s *Store) CreateUser(u *User) (*User, error) {
 	u.CreatedAt = now()
+	if u.LastReset == 0 {
+		u.LastReset = u.CreatedAt
+	}
 	res, err := s.db.Exec(
-		`INSERT INTO users (username, uuid, sub_token, quota_bytes, used_bytes, expires_at, enabled, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.Username, u.UUID, u.SubToken, u.QuotaBytes, u.UsedBytes, u.ExpiresAt, b2i(u.Enabled), u.CreatedAt)
+		`INSERT INTO users (username, uuid, sub_token, quota_bytes, used_bytes, expires_at, enabled, ip_limit, reset_days, last_reset, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.Username, u.UUID, u.SubToken, u.QuotaBytes, u.UsedBytes, u.ExpiresAt, b2i(u.Enabled),
+		u.IPLimit, u.ResetDays, u.LastReset, u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -46,12 +53,12 @@ func (s *Store) CreateUser(u *User) (*User, error) {
 	return u, nil
 }
 
-const userCols = `id, username, uuid, sub_token, quota_bytes, used_bytes, expires_at, enabled, created_at`
+const userCols = `id, username, uuid, sub_token, quota_bytes, used_bytes, expires_at, enabled, ip_limit, reset_days, last_reset, created_at`
 
 func scanUser(sc interface{ Scan(...any) error }) (*User, error) {
 	var u User
 	var enabled int
-	if err := sc.Scan(&u.ID, &u.Username, &u.UUID, &u.SubToken, &u.QuotaBytes, &u.UsedBytes, &u.ExpiresAt, &enabled, &u.CreatedAt); err != nil {
+	if err := sc.Scan(&u.ID, &u.Username, &u.UUID, &u.SubToken, &u.QuotaBytes, &u.UsedBytes, &u.ExpiresAt, &enabled, &u.IPLimit, &u.ResetDays, &u.LastReset, &u.CreatedAt); err != nil {
 		return nil, err
 	}
 	u.Enabled = enabled != 0
@@ -107,8 +114,21 @@ func (s *Store) GetUserBySubToken(tok string) (*User, error) { return s.getUserB
 // UpdateUser updates mutable fields of a user.
 func (s *Store) UpdateUser(u *User) error {
 	res, err := s.db.Exec(
-		`UPDATE users SET username=?, quota_bytes=?, used_bytes=?, expires_at=?, enabled=? WHERE id=?`,
-		u.Username, u.QuotaBytes, u.UsedBytes, u.ExpiresAt, b2i(u.Enabled), u.ID)
+		`UPDATE users SET username=?, quota_bytes=?, used_bytes=?, expires_at=?, enabled=?, ip_limit=?, reset_days=?, last_reset=? WHERE id=?`,
+		u.Username, u.QuotaBytes, u.UsedBytes, u.ExpiresAt, b2i(u.Enabled),
+		u.IPLimit, u.ResetDays, u.LastReset, u.ID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ResetUsage zeroes a user's used bytes and stamps the reset time.
+func (s *Store) ResetUsage(id int64) error {
+	res, err := s.db.Exec(`UPDATE users SET used_bytes=0, last_reset=? WHERE id=?`, now(), id)
 	if err != nil {
 		return err
 	}

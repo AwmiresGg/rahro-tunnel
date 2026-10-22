@@ -51,6 +51,8 @@ func Run(st *store.Store, cfg *config.PanelConfig, log *slog.Logger) error {
 	}()
 	// Meter per-user traffic and enforce quotas/expiry in the background.
 	go apiSrv.RunTrafficLoop(context.Background(), 45*time.Second)
+	// Tail the access log for online clients and IP-limit enforcement.
+	go apiSrv.RunOnlineLoop(context.Background(), 10*time.Second)
 
 	apiMux := apiSrv.Routes()
 

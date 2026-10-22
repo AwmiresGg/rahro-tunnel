@@ -25,10 +25,12 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 type createUserReq struct {
-	Username string `json:"username"`
-	QuotaGB  int64  `json:"quota_gb"` // 0 = unlimited
-	Days     int64  `json:"days"`     // 0 = never expires
-	Enabled  *bool  `json:"enabled"`
+	Username  string `json:"username"`
+	QuotaGB   int64  `json:"quota_gb"`   // 0 = unlimited
+	Days      int64  `json:"days"`       // 0 = never expires
+	IPLimit   int    `json:"ip_limit"`   // 0 = unlimited
+	ResetDays int    `json:"reset_days"` // 0 = no auto reset
+	Enabled   *bool  `json:"enabled"`
 }
 
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -42,6 +44,8 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		UUID:       auth.NewUUIDHex(),
 		SubToken:   auth.NewToken(18),
 		QuotaBytes: req.QuotaGB * gib,
+		IPLimit:    req.IPLimit,
+		ResetDays:  req.ResetDays,
 		Enabled:    true,
 	}
 	if req.Enabled != nil {
@@ -79,6 +83,8 @@ type updateUserReq struct {
 	UsedBytes  *int64  `json:"used_bytes"`
 	ExpiresAt  *int64  `json:"expires_at"`
 	Enabled    *bool   `json:"enabled"`
+	IPLimit    *int    `json:"ip_limit"`
+	ResetDays  *int    `json:"reset_days"`
 }
 
 func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -112,12 +118,34 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	if req.Enabled != nil {
 		u.Enabled = *req.Enabled
 	}
+	if req.IPLimit != nil {
+		u.IPLimit = *req.IPLimit
+	}
+	if req.ResetDays != nil {
+		u.ResetDays = *req.ResetDays
+	}
 	if err := s.Store.UpdateUser(u); err != nil {
 		httpError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	s.ApplyXray()
 	writeJSON(w, http.StatusOK, u)
+}
+
+// handleResetUser zeroes a user's used traffic (manual reset).
+func (s *Server) handleResetUser(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		httpError(w, http.StatusBadRequest, "bad id")
+		return
+	}
+	if err := s.Store.ResetUsage(id); err != nil {
+		httpError(w, http.StatusNotFound, "not found")
+		return
+	}
+	// A reset may re-activate a user that was over quota, so reapply.
+	s.ApplyXray()
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {

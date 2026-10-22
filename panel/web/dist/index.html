@@ -118,15 +118,31 @@ function show(v){
 const gb=n=>{if(!n)return '∞';const g=n/1073741824;if(g>=10)return g.toFixed(0)+' GB';if(g>=0.1)return g.toFixed(1)+' GB';const m=n/1048576;return (m>=1?m.toFixed(0)+' MB':(n/1024).toFixed(0)+' KB')};
 const used=n=>{const g=n/1073741824;if(g>=1)return g.toFixed(2)+' GB';const m=n/1048576;return m>=1?m.toFixed(1)+' MB':(n/1024).toFixed(0)+' KB'};
 const when=t=>t?new Date(t*1000).toISOString().slice(0,10):'—';
+const pct=(u,t)=>t>0?Math.min(100,Math.round(u/t*100)):0;
+const uptime=s=>{if(!s)return '—';const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return (d?d+'d ':'')+(h?h+'h ':'')+m+'m'};
+function bar(label,u,t,val){const p=pct(u,t);const col=p>=90?'var(--bad)':p>=70?'var(--warn)':'var(--ok)';
+  return `<div style="margin:8px 0"><div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--dim)">${label}</span><span class="mono">${val}</span></div>
+    <div style="height:7px;border-radius:4px;background:rgba(127,127,127,.18);margin-top:4px;overflow:hidden"><div style="height:100%;width:${p}%;background:${col}"></div></div></div>`}
 
 async function renderDash(){
   const s=await api('GET','/api/stats');
   let xr={}; try{xr=await api('GET','/api/xray/status')}catch(e){}
+  let sys=null; try{sys=await api('GET','/api/system')}catch(e){}
   const xstate = !xr.enabled?'<span class="badge b-bad">off</span>'
     : xr.running?'<span class="badge b-ok">running</span>'
     : xr.installed?'<span class="badge b-warn">installed, idle</span>'
     : '<span class="badge b-warn">downloading…</span>';
   const xver = xr.version?('<div class="mono" style="margin-top:6px">'+esc(xr.version)+'</div>'):'';
+  let sysCard='';
+  if(sys){
+    sysCard=`<div class="card"><div style="font-weight:600;margin-bottom:6px">Server status
+      <span class="mono" style="color:var(--dim);font-weight:400;margin-left:8px">${esc(sys.os)}/${esc(sys.arch)} · ${sys.cpu_count} CPU · up ${uptime(sys.uptime_sec)} · load ${sys.load1}</span></div>
+      ${bar('CPU',sys.cpu_percent,100,sys.cpu_percent+'%')}
+      ${bar('Memory',sys.mem_used,sys.mem_total,used(sys.mem_used)+' / '+used(sys.mem_total))}
+      ${sys.disk_total?bar('Disk',sys.disk_used,sys.disk_total,used(sys.disk_used)+' / '+used(sys.disk_total)):''}
+      ${sys.swap_total?bar('Swap',sys.swap_used,sys.swap_total,used(sys.swap_used)+' / '+used(sys.swap_total)):''}
+    </div>`;
+  }
   $('#content').innerHTML=`<div class="grid">
     <div class="stat"><div style="color:var(--dim)">Users</div><div class="n">${s.users}</div></div>
     <div class="stat"><div style="color:var(--dim)">Active users</div><div class="n">${s.active_users}</div></div>
@@ -137,31 +153,43 @@ async function renderDash(){
     <div style="font-weight:600">Xray core</div> ${xstate}
     <button class="btn-ghost" style="margin-left:auto" onclick="xrayApply()">Apply / restart</button>
   </div>${xver?('<div class="card">'+xver+'</div>'):''}
+  ${sysCard}
   <div class="card">Manage users, inbounds (served by Xray), nodes/tunnels, and API tokens from the sidebar. Changes to inbounds or users apply to Xray automatically.</div>`;
 }
 async function xrayApply(){try{await api('POST','/api/xray/apply');toast('Xray reloaded');renderDash()}catch(e){toast(e.message)}}
 async function renderUsers(){
   const u=await api('GET','/api/users');
-  let rows=u.map(x=>`<tr>
+  let on={}; try{on=await api('GET','/api/onlines')}catch(e){}
+  let rows=u.map(x=>{
+    const o=on[x.username], ips=o?o.ips:[], online=o?o.online:0;
+    const dot=online>0?`<span class="badge b-ok" title="${esc(ips.join(', '))}">● ${online} online</span>`
+      : ips.length?`<span class="badge b-warn" title="${esc(ips.join(', '))}">${ips.length} IP</span>`:'';
+    const lim=x.ip_limit>0?`<div class="mono" style="color:var(--dim)">IP≤${x.ip_limit}</div>`:'';
+    const cyc=x.reset_days>0?`<div class="mono" style="color:var(--dim)">↻${x.reset_days}d</div>`:'';
+    return `<tr>
     <td><b>${esc(x.username)}</b><div class="mono">${x.uuid.slice(0,12)}…</div></td>
-    <td>${used(x.used_bytes)} / ${gb(x.quota_bytes)}</td>
-    <td>${when(x.expires_at)}</td>
-    <td>${x.active?'<span class="badge b-ok">active</span>':'<span class="badge b-bad">inactive</span>'}</td>
+    <td>${used(x.used_bytes)} / ${gb(x.quota_bytes)}${cyc}</td>
+    <td>${when(x.expires_at)}${lim}</td>
+    <td>${x.active?'<span class="badge b-ok">active</span>':'<span class="badge b-bad">inactive</span>'} ${dot}</td>
     <td><button class="btn-ghost" onclick="copySub('${x.sub_token}')">sub</button>
-        <button class="btn-danger" onclick="delUser(${x.id})">del</button></td></tr>`).join('');
+        <button class="btn-ghost" onclick="resetUser(${x.id})" title="Reset used traffic">↻</button>
+        <button class="btn-danger" onclick="delUser(${x.id})">del</button></td></tr>`}).join('');
   $('#content').innerHTML=`<div class="card"><div class="row">
       <div><label>Username</label><input id="nu" class="in"></div>
       <div><label>Quota (GB, 0=∞)</label><input id="nq" class="in" type="number" value="100"></div>
       <div><label>Days (0=never)</label><input id="nd" class="in" type="number" value="30"></div>
+      <div><label>IP limit (0=∞)</label><input id="nil" class="in" type="number" value="0"></div>
+      <div><label>Reset cycle (days, 0=off)</label><input id="nrd" class="in" type="number" value="0"></div>
       <div style="flex:0"><button class="btn" onclick="addUser()">+ Add user</button></div>
     </div></div>
     <table><thead><tr><th>User</th><th>Usage</th><th>Expiry</th><th>Status</th><th></th></tr></thead>
     <tbody>${rows||'<tr><td colspan=5 style="color:var(--dim)">No users yet</td></tr>'}</tbody></table>`;
 }
 async function addUser(){try{
-  await api('POST','/api/users',{username:$('#nu').value,quota_gb:+$('#nq').value,days:+$('#nd').value});
+  await api('POST','/api/users',{username:$('#nu').value,quota_gb:+$('#nq').value,days:+$('#nd').value,ip_limit:+$('#nil').value,reset_days:+$('#nrd').value});
   renderUsers();toast('User created');
 }catch(e){toast(e.message)}}
+async function resetUser(id){if(!confirm('Reset this user\'s used traffic to zero?'))return;try{await api('POST','/api/users/'+id+'/reset');renderUsers();toast('Traffic reset')}catch(e){toast(e.message)}}
 async function delUser(id){if(!confirm('Delete user?'))return;await api('DELETE','/api/users/'+id);renderUsers()}
 function copySub(tok){const url=location.origin+'/sub/'+tok;navigator.clipboard?.writeText(url);toast('Subscription link copied: '+url)}
 

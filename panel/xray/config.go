@@ -44,7 +44,9 @@ func GenerateConfig(inbounds []*store.Inbound, users []*store.User) map[string]a
 	}
 
 	return map[string]any{
-		"log":   map[string]any{"loglevel": "warning"},
+		// access.log (relative to Xray's working dir) lets the panel show online
+		// clients and per-user source IPs, and enforce per-user IP limits.
+		"log":   map[string]any{"loglevel": "warning", "access": "access.log"},
 		"api":   map[string]any{"tag": "api", "services": []string{"StatsService"}},
 		"stats": map[string]any{},
 		"policy": map[string]any{
