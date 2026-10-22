@@ -78,10 +78,13 @@ func (s *Server) handleXrayApply(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusServiceUnavailable, "xray is not enabled on this panel")
 		return
 	}
-	s.ApplyXray()
+	err := s.ApplyXrayErr()
 	resp := map[string]any{
 		"installed": s.Xray.Installed(),
 		"running":   s.Xray.Running(),
+	}
+	if err != nil {
+		resp["error"] = err.Error()
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

@@ -165,7 +165,7 @@ async function renderDash(){
   ${sysCard}
   <div class="card">Manage users, inbounds (served by Xray), nodes/tunnels, and API tokens from the sidebar. Changes to inbounds or users apply to Xray automatically.</div>`;
 }
-async function xrayApply(){try{await api('POST','/api/xray/apply');toast('Xray reloaded');renderDash()}catch(e){toast(e.message)}}
+async function xrayApply(){try{const r=await api('POST','/api/xray/apply');toast(r.error?('Apply error: '+r.error):'Xray reloaded');renderDash()}catch(e){toast(e.message)}}
 async function runDiag(){
   const el=$('#diag'); el.innerHTML='<div class="card">Running checks…</div>';
   let d; try{d=await api('GET','/api/diag')}catch(e){el.innerHTML='';return toast(e.message)}
@@ -173,8 +173,9 @@ async function runDiag(){
   let h='<div class="card"><div style="font-weight:600;margin-bottom:8px">Connection diagnostics</div>';
   h+=`<div style="margin:4px 0">Xray installed ${yn(d.xray.installed)} · running ${yn(d.xray.running)}</div>`;
   h+=`<div style="margin:4px 0">Link host: <span class="mono">${esc(d.public_host||'?')}</span></div>`;
-  (d.inbounds||[]).forEach(i=>{h+=`<div style="margin:4px 0">Inbound <b>${esc(i.tag)}</b> :${i.port} (${esc(i.security)}) — port listening ${yn(i.listening)}</div>`});
+  (d.inbounds||[]).forEach(i=>{const km=(i.keys_match_running===undefined)?'':` · keys match running ${yn(i.keys_match_running)}`;h+=`<div style="margin:4px 0">Inbound <b>${esc(i.tag)}</b> :${i.port} (${esc(i.security)}) — port listening ${yn(i.listening)}${km}</div>`});
   (d.reality_dests||[]).forEach(x=>{h+=`<div style="margin:4px 0">REALITY dest <span class="mono">${esc(x.dest)}</span> reachable ${yn(x.reachable)}</div>`});
+  if(d.stale_keys) h+='<div style="color:var(--bad);font-size:13px;margin-top:8px"><b>⚠ The running Xray config is STALE</b> — its REALITY keys don\'t match the panel. Click <b>Apply / restart</b> above, then re-copy the config link. This is the usual cause of "received real certificate" / configs not connecting.</div>';
   if(!d.xray.running) h+='<div style="color:var(--warn);font-size:12px;margin-top:8px">Xray is not running — inbounds will not serve. If it says "downloading…", the server can\'t reach GitHub to fetch Xray.</div>';
   const anyDown=(d.inbounds||[]).some(i=>!i.listening);
   if(anyDown) h+='<div style="color:var(--warn);font-size:12px;margin-top:8px">A port is not listening. Check the inbound\'s port isn\'t already in use, and open it in the server/cloud firewall.</div>';

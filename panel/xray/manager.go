@@ -53,6 +53,10 @@ func (m *Manager) confPath() string { return filepath.Join(m.dir, "config.json")
 // which the panel tails to compute online clients and enforce IP limits.
 func (m *Manager) AccessLogPath() string { return filepath.Join(m.dir, "access.log") }
 
+// ReadConfig returns the config.json Xray is currently running, for diagnostics
+// (e.g. detecting a stale on-disk config whose keys no longer match the DB).
+func (m *Manager) ReadConfig() ([]byte, error) { return os.ReadFile(m.confPath()) }
+
 // Installed reports whether the Xray binary is present.
 func (m *Manager) Installed() bool {
 	st, err := os.Stat(m.binPath())
@@ -230,6 +234,11 @@ func (m *Manager) startLocked() error {
 	if !m.Installed() {
 		return fmt.Errorf("xray: binary not installed (call EnsureBinary)")
 	}
+	// Kill any orphaned Xray from a previous panel instance that may still hold
+	// the inbound ports with a stale config (stale keys cause REALITY auth
+	// failures). Without this, a new config can't bind and the old one keeps
+	// serving the wrong keys.
+	m.killOrphans()
 	lf, err := os.OpenFile(filepath.Join(m.dir, "xray.log"),
 		os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
