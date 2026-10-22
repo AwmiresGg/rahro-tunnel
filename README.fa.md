@@ -44,10 +44,13 @@ sudo bash rahro-install.sh
 ## اولین کانفیگِ کارآمد (۳۰ ثانیه)
 
 1. تب **Inbounds** → پروتکل **VLESS**، پورت **443**، network **tcp**، security
-   **reality**.
-2. دکمه‌ی **🔑 Generate REALITY keys** (کلیدها در Settings پر می‌شوند) → **Add inbound**.
-3. تب **Users** → **Add user** → دکمه‌ی **sub** → لینک سابسکریپشن کپی می‌شود.
-4. لینک را در v2rayNG / NekoBox / sing-box / Clash-Meta بگذار → **وصل می‌شود**.
+   **reality** → **Add inbound**. کلیدهای REALITY، SNI، dest و shortId خودکار پر
+   می‌شوند — نیازی به نوشتن دستی JSON نیست.
+2. تب **Users** → **Add user** (در صورت خواستن، تیک بزن کدام اینباندها مجاز باشند).
+3. روی کاربر دکمه‌ی **config** را بزن تا هر لینک کانفیگ با دکمه‌ی **copy** و **QR**
+   دیده شود، یا **sub** برای کپی لینک سابسکریپشن.
+4. لینک را در v2rayNG / NekoBox / sing-box / Clash-Meta بگذار یا QR را اسکن کن →
+   **وصل می‌شود**.
 
 پنل Xray را با اینباندهای تو و هر کاربر فعال به‌عنوان کلاینت اجرا می‌کند؛ سابسکریپشن
 لینک‌های واقعیِ `vless://…reality` (و vmess/trojan/ss) می‌دهد که کلاینت‌های آماده

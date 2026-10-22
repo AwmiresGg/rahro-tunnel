@@ -1,10 +1,8 @@
 package api
 
 import (
-	"encoding/base64"
 	"net/http"
 
-	"github.com/awmiresgg/rahro/core/crypto"
 	"github.com/awmiresgg/rahro/panel/xray"
 )
 
@@ -12,23 +10,31 @@ import (
 // The private key goes in the inbound's reality settings; the public key goes
 // into client share links (pbk=).
 func (s *Server) handleRealityKeys(w http.ResponseWriter, r *http.Request) {
-	kp, err := crypto.GenerateKeyPair()
+	priv, pub, err := s.realityKeypair()
 	if err != nil {
 		httpError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{
-		"privateKey": base64.RawURLEncoding.EncodeToString(kp.PrivateBytes()),
-		"publicKey":  base64.RawURLEncoding.EncodeToString(kp.PublicBytes()),
+		"privateKey": priv,
+		"publicKey":  pub,
 	})
 }
 
-// ApplyXray regenerates the Xray config from the current inbounds+users and
-// (re)starts the core. It is a no-op when Xray is not configured. Errors are
-// logged, not returned, so user/inbound edits never fail because of Xray.
+// ApplyXray regenerates and applies the Xray config, logging any error. Most
+// callers use this fire-and-forget form.
 func (s *Server) ApplyXray() {
+	if err := s.ApplyXrayErr(); err != nil {
+		s.Log.Error("xray apply failed", "err", err)
+	}
+}
+
+// ApplyXrayErr regenerates the Xray config from the current inbounds+users and
+// (re)starts the core, returning any error (e.g. Xray rejected the config). It
+// is a no-op when Xray is not configured or installed.
+func (s *Server) ApplyXrayErr() error {
 	if s.Xray == nil {
-		return
+		return nil
 	}
 	inbounds, _ := s.Store.ListInbounds()
 	users, _ := s.Store.ListUsers()
@@ -46,16 +52,13 @@ func (s *Server) ApplyXray() {
 		}
 	}
 	if !enabled {
-		_ = s.Xray.Stop()
-		return
+		return s.Xray.Stop()
 	}
 	if !s.Xray.Installed() {
 		s.Log.Warn("xray binary not installed yet; skipping apply")
-		return
+		return nil
 	}
-	if err := s.Xray.Apply(xray.GenerateConfig(inbounds, users)); err != nil {
-		s.Log.Error("xray apply failed", "err", err)
-	}
+	return s.Xray.Apply(xray.GenerateConfig(inbounds, users))
 }
 
 func (s *Server) handleXrayStatus(w http.ResponseWriter, r *http.Request) {

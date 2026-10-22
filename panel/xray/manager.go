@@ -129,7 +129,10 @@ func extractFile(zipPath, name, dst string) error {
 	return fmt.Errorf("xray: %q not found in archive", name)
 }
 
-// Apply writes the config and (re)starts Xray with it.
+// Apply writes the config and (re)starts Xray with it. The config is validated
+// with `xray -test` before it replaces the live one, so a single bad inbound
+// cannot take the running core down — Apply returns an error and the previous
+// config keeps serving.
 func (m *Manager) Apply(cfg map[string]any) error {
 	b, err := Marshal(cfg)
 	if err != nil {
@@ -138,14 +141,75 @@ func (m *Manager) Apply(cfg map[string]any) error {
 	if err := os.MkdirAll(m.dir, 0o755); err != nil {
 		return err
 	}
-	tmp := m.confPath() + ".tmp"
+	// The temp file keeps a .json extension so `xray -test` detects its format.
+	tmp := filepath.Join(m.dir, "config.check.json")
 	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+		return err
+	}
+	if err := m.validate(tmp); err != nil {
+		os.Remove(tmp)
 		return err
 	}
 	if err := os.Rename(tmp, m.confPath()); err != nil {
 		return err
 	}
 	return m.restart()
+}
+
+// validate runs `xray run -test` against a config file and returns a readable
+// error if Xray rejects it. A missing binary skips validation (best-effort).
+func (m *Manager) validate(confPath string) error {
+	if !m.Installed() {
+		return nil
+	}
+	out, err := exec.Command(m.binPath(), "run", "-test", "-c", confPath).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("xray rejected config: %s", lastMeaningful(out))
+	}
+	return nil
+}
+
+// lastMeaningful returns the most informative line of Xray's test output
+// (the last non-empty line, which carries the actual error).
+func lastMeaningful(b []byte) string {
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if s := strings.TrimSpace(lines[i]); s != "" {
+			return s
+		}
+	}
+	return "unknown error"
+}
+
+// GenerateRealityKeypair returns an X25519 keypair in Xray's own base64 format
+// by invoking `xray x25519`, so the keys are guaranteed compatible with the
+// core. Returns an error if the binary is unavailable or its output is
+// unexpected (callers may fall back to their own generator).
+func (m *Manager) GenerateRealityKeypair() (priv, pub string, err error) {
+	if !m.Installed() {
+		return "", "", fmt.Errorf("xray not installed")
+	}
+	out, err := exec.Command(m.binPath(), "x25519").Output()
+	if err != nil {
+		return "", "", err
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		v := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(v, "PrivateKey:"):
+			priv = strings.TrimSpace(strings.TrimPrefix(v, "PrivateKey:"))
+		case strings.HasPrefix(v, "Password (PublicKey):"):
+			pub = strings.TrimSpace(strings.TrimPrefix(v, "Password (PublicKey):"))
+		case strings.HasPrefix(v, "Public key:"): // older xray
+			pub = strings.TrimSpace(strings.TrimPrefix(v, "Public key:"))
+		case strings.HasPrefix(v, "Private key:"):
+			priv = strings.TrimSpace(strings.TrimPrefix(v, "Private key:"))
+		}
+	}
+	if priv == "" || pub == "" {
+		return "", "", fmt.Errorf("xray x25519: unexpected output")
+	}
+	return priv, pub, nil
 }
 
 // Start launches Xray with the current config.
@@ -181,7 +245,16 @@ func (m *Manager) startLocked() error {
 	}
 	m.cmd = cmd
 	m.logf = lf
-	go func() { _ = cmd.Wait() }() // reap
+	// Reap and, if the process exits on its own (e.g. a config it rejected at
+	// runtime), clear it so Running() reports the truth.
+	go func() {
+		_ = cmd.Wait()
+		m.mu.Lock()
+		if m.cmd == cmd {
+			m.cmd = nil
+		}
+		m.mu.Unlock()
+	}()
 	m.log.Info("xray started", "pid", cmd.Process.Pid)
 	return nil
 }

@@ -44,6 +44,13 @@
   tr:last-child td{border-bottom:none}
   .badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
   .b-ok{background:#10362b;color:var(--ok)} .b-bad{background:#3a1414;color:var(--bad)} .b-warn{background:#3a2a10;color:var(--warn)}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:50;overflow:auto}
+  .modal-box{background:var(--card,#121a2e);border:1px solid var(--border);border-radius:14px;max-width:620px;width:100%;padding:18px}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .lk{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .lk .lkhead{display:flex;justify-content:space-between;align-items:center;width:100%}
+  .lk .lktext{flex:1;min-width:0;word-break:break-all;font-size:11px;color:var(--dim)}
+  .lk .qr{width:104px;height:104px;background:#fff;padding:5px;border-radius:8px;flex:0 0 auto}
   .row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
   .row>div{flex:1;min-width:120px}
   .mono{font-family:ui-monospace,monospace;font-size:12px;color:var(--dim)}
@@ -175,7 +182,8 @@ async function renderUsers(){
     <td class="mono" style="font-size:12px">${ib}</td>
     <td>${when(x.expires_at)}${lim}</td>
     <td>${x.active?'<span class="badge b-ok">active</span>':'<span class="badge b-bad">inactive</span>'} ${dot}</td>
-    <td><button class="btn-ghost" onclick="copySub('${x.sub_token}')">sub</button>
+    <td><button class="btn-ghost" onclick="showLinks(${x.id})" title="Configs & QR codes">config</button>
+        <button class="btn-ghost" onclick="copySub('${x.sub_token}')">sub</button>
         <button class="btn-ghost" onclick="resetUser(${x.id})" title="Reset used traffic">↻</button>
         <button class="btn-danger" onclick="delUser(${x.id})">del</button></td></tr>`}).join('');
   const ibChecks=enIns.length
@@ -203,6 +211,27 @@ async function addUser(){try{
 async function resetUser(id){if(!confirm('Reset this user\'s used traffic to zero?'))return;try{await api('POST','/api/users/'+id+'/reset');renderUsers();toast('Traffic reset')}catch(e){toast(e.message)}}
 async function delUser(id){if(!confirm('Delete user?'))return;await api('DELETE','/api/users/'+id);renderUsers()}
 function copySub(tok){const url=location.origin+'/sub/'+tok;navigator.clipboard?.writeText(url);toast('Subscription link copied: '+url)}
+async function showLinks(id){
+  let d; try{d=await api('GET','/api/users/'+id+'/links')}catch(e){return toast(e.message)}
+  const item=(label,link)=>`<div class="lk">
+     <div class="lkhead"><b>${esc(label)}</b><button class="btn-ghost" onclick="copyText(this,'${encodeURIComponent(link)}')">copy link</button></div>
+     <img class="qr" src="/api/qr?text=${encodeURIComponent(link)}" alt="QR" title="Scan in your client">
+     <div class="mono lktext">${esc(link)}</div>
+   </div>`;
+  let html=item('Subscription (all configs)',d.sub);
+  html+=(d.links||[]).map(l=>item(l.tag+' · '+l.protocol,l.link)).join('');
+  if(!d.links||!d.links.length) html+='<div style="color:var(--dim)">No enabled inbounds are assigned to this user yet — add one in the Inbounds tab or assign this user to an inbound.</div>';
+  openModal('Configs & QR codes',html);
+}
+function copyText(btn,enc){const t=decodeURIComponent(enc);navigator.clipboard?.writeText(t);const o=btn.textContent;btn.textContent='✓ copied';setTimeout(()=>btn.textContent=o,1200)}
+function openModal(title,html){
+  let m=document.getElementById('modal');
+  if(!m){m=document.createElement('div');m.id='modal';document.body.appendChild(m);m.addEventListener('click',e=>{if(e.target===m)closeModal()})}
+  m.className='modal';
+  m.innerHTML=`<div class="modal-box"><div class="modal-head"><b>${esc(title)}</b><button class="btn-ghost" onclick="closeModal()">✕ close</button></div><div>${html}</div></div>`;
+}
+function closeModal(){const m=document.getElementById('modal');if(m){m.className='hidden';m.innerHTML=''}}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 
 async function renderInbounds(){
   const ins=await api('GET','/api/inbounds');

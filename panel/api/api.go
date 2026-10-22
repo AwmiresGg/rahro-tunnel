@@ -75,6 +75,8 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("PATCH /api/users/{id}", s.admin(s.handleUpdateUser))
 	mux.HandleFunc("DELETE /api/users/{id}", s.admin(s.handleDeleteUser))
 	mux.HandleFunc("POST /api/users/{id}/reset", s.admin(s.handleResetUser))
+	mux.HandleFunc("GET /api/users/{id}/links", s.admin(s.handleUserLinks))
+	mux.HandleFunc("GET /api/qr", s.admin(s.handleQR))
 
 	// Inbounds.
 	mux.HandleFunc("GET /api/inbounds", s.admin(s.handleListInbounds))

@@ -43,10 +43,13 @@ browser warning). Then log in.
 ## Your first working config (30 seconds)
 
 1. **Inbounds** tab → Protocol **VLESS**, Port **443**, network **tcp**,
-   security **reality**.
-2. Click **🔑 Generate REALITY keys** (fills the keys into Settings) → **Add inbound**.
-3. **Users** tab → **Add user** → click **sub** to copy the subscription link.
-4. Paste the link into v2rayNG / NekoBox / sing-box / Clash-Meta → **it connects**.
+   security **reality** → **Add inbound**. REALITY keys, SNI, dest and a short
+   ID are filled in automatically — no hand-written JSON needed.
+2. **Users** tab → **Add user** (optionally tick which inbounds it may use).
+3. Click **config** on the user to see every config link with a **copy** button
+   and a **QR code**, or **sub** to copy the subscription link.
+4. Paste a link / scan the QR in v2rayNG / NekoBox / sing-box / Clash-Meta →
+   **it connects**.
 
 The panel runs Xray with your inbounds and every active user as a client; the
 subscription returns real `vless://…reality` (and vmess/trojan/ss) links that

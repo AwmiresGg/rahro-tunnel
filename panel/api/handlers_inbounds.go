@@ -34,13 +34,22 @@ func (s *Server) handleCreateInbound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.Enabled = true
+	s.normalizeInbound(&in) // auto-complete REALITY/TLS fields so it just works
 	created, err := s.Store.CreateInbound(&in)
 	if err != nil {
 		httpError(w, http.StatusConflict, err.Error())
 		return
 	}
-	s.ApplyXray()
-	writeJSON(w, http.StatusCreated, created)
+	// Embed the inbound so its fields stay top-level (clients decode it as an
+	// Inbound) while still surfacing any Xray apply warning.
+	resp := struct {
+		*store.Inbound
+		XrayWarning string `json:"xray_warning,omitempty"`
+	}{created, ""}
+	if err := s.ApplyXrayErr(); err != nil {
+		resp.XrayWarning = err.Error()
+	}
+	writeJSON(w, http.StatusCreated, resp)
 }
 
 func (s *Server) handleGetInbound(w http.ResponseWriter, r *http.Request) {
@@ -79,12 +88,19 @@ func (s *Server) handleUpdateInbound(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, msg)
 		return
 	}
+	s.normalizeInbound(&in)
 	if err := s.Store.UpdateInbound(&in); err != nil {
 		httpError(w, http.StatusConflict, err.Error())
 		return
 	}
-	s.ApplyXray()
-	writeJSON(w, http.StatusOK, &in)
+	resp := struct {
+		*store.Inbound
+		XrayWarning string `json:"xray_warning,omitempty"`
+	}{&in, ""}
+	if err := s.ApplyXrayErr(); err != nil {
+		resp.XrayWarning = err.Error()
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleDeleteInbound(w http.ResponseWriter, r *http.Request) {
