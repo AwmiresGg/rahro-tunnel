@@ -1,248 +1,178 @@
-# Rahro — DPI-resistant tunnel + management panel
+# Rahro — Xray panel + DPI-resistant tunnel
 
 <p align="center"><b>English</b> · <a href="README.fa.md">فارسی 🇮🇷</a></p>
 
 ![Rahro panel — dashboard](docs/assets/dashboard.png)
 
-**Rahro** (رهرو, "wayfarer") is a censorship-circumvention tunnel with a web
-panel, built for networks that use Deep Packet Inspection (DPI) and active
-probing. It runs on **Linux and Windows servers**, manages **users, inbounds,
-nodes and tunnels from one panel**, supports **multi-location subscriptions**,
-and lets an Iran relay reach a foreign server over an obfuscated channel that
-looks like ordinary HTTPS.
+**Rahro** (رهرو, "wayfarer") is a self-hosted management panel for bypassing
+internet censorship. It gives you **the full feature set of an Xray panel**
+(inbounds for VLESS / VMess / Trojan / Shadowsocks, REALITY, users, quotas,
+subscriptions, a Telegram bot API) **plus a dedicated DPI-resistant tunnel** for
+relaying an in-country server to a foreign one over traffic that looks like
+ordinary HTTPS. One panel, on **Linux or Windows**, manages everything.
 
-> **فارسی:** Rahro یک تونل ضدِ DPI با پنل وب است. روی سرور خارج نصب می‌شود،
-> می‌توانی نودهای چندلوکیشنی و «نود تانل» (رله‌ی ایران) اضافه کنی، کاربرها و
-> اینباندها را از یک پنل مدیریت کنی، و به ربات فروش تلگرام با توکن API وصلش کنی.
-> نصب یک‌خطی پایین آمده است.
-
-> **Honest scope:** no tool is "unbreakable." Rahro raises the cost of detection
-> so that blocking it means blocking normal HTTPS. It cannot defeat a full
-> internet shutdown. It uses only vetted cryptography (X25519 / ChaCha20-Poly1305
-> / HKDF, TLS 1.3) — no bespoke crypto. See [docs/SECURITY.md](docs/SECURITY.md).
+> **Honest scope.** No tool is unbreakable; this raises the cost of detection so
+> blocking it means blocking normal HTTPS. It cannot defeat a full internet
+> shutdown. It uses only vetted cryptography and runs **Xray-core as a managed
+> binary** (no Xray/3x-ui source copied). See [docs/SECURITY.md](docs/SECURITY.md).
 
 ---
 
-## How it works
+## Install (foreign server)
 
-```
-        ┌──────── MAIN PANEL (foreign VPS) ────────┐
-        │ users · inbounds · nodes · tunnels · subs │
-        └───┬───────────────────────────────┬───────┘
-     control (enroll code + secret)          │
-            │                                 │
-   ┌────────▼ LOCATION NODES (egress) ──┐     │ Rahro tunnel (looks like HTTPS)
-   │  NL · TR · DE …  multi-location subs│     │
-   └─────────────────────────────────────┘     │
-                              ┌─────────────────▼ TUNNEL NODE (Iran relay) ─┐
-   user in Iran ─► domestic IP│ serves standard inbounds and/or Rahro, then │
-   (low latency, not blocked) │ relays out over the Rahro tunnel            │
-                              └──────────────────────────────────────────────┘
-```
-
-- **REALITY-style defense:** a client proves it knows the server's X25519 key;
-  anyone who doesn't (a browser, a censor's prober) is transparently proxied to
-  a real **decoy** site, so probing learns nothing.
-- **Obfuscation:** TLS 1.3 with a real browser ClientHello (uTLS), frame-length
-  padding, and multiplexing many streams over one connection.
-- **Transports:** TLS (default) and WebSocket (CDN-friendly); more are pluggable.
-
-Full design: [docs/DESIGN.md](docs/DESIGN.md).
-
----
-
-## 1. Install the panel (foreign server)
-
-As root, on Ubuntu/Debian/CentOS — download then run (works on every terminal):
+As root on Ubuntu/Debian/CentOS — download then run (works on any terminal):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh -o rahro-install.sh
 sudo bash rahro-install.sh
 ```
 
-> Or pipe it: `curl -fsSL …/install.sh | sudo bash`.
-> Avoid `bash <(curl …)` — some mobile/SSH terminals fail it with
-> `/dev/fd/63: No such file or directory`.
->
-> Building from a clone works too (and `scripts/install.sh` detects the checkout
-> and builds from it): `git clone https://github.com/AwmiresGg/rahro-tunnel.git && cd rahro-tunnel && sudo bash scripts/install.sh`.
+> Or pipe it: `curl -fsSL …/install.sh | sudo bash`. Avoid `bash <(curl …)` —
+> some mobile/SSH terminals fail it with `/dev/fd/63: No such file or directory`.
 
-It downloads a prebuilt binary from GitHub (no Go/compile needed; it only builds
-from source as a fallback), writes `/etc/rahro/panel.json`, creates an admin,
-and starts the `rahro-panel` service. At the end it prints your **panel URL**
-and **admin credentials**.
+It downloads a prebuilt binary from GitHub (no Go/compile needed), writes
+`/etc/rahro/panel.json`, creates an admin, starts the `rahro-panel` service, and
+prints your **panel URL** and **admin password**. On first run the panel also
+downloads **Xray-core** in the background (a few seconds).
 
-Open the panel in a browser:
-
-- `https://<server-ip>:2053` — self-signed TLS (default; accept the warning), **or**
-- `http://<server-ip>:2053` — set `"tls_mode": "off"`, **or**
-- `https://panel.example.com:2053` — set `"tls_mode": "domain"` + `"domain"` for a free Let's Encrypt cert.
-
-Edit `/etc/rahro/panel.json` then `systemctl restart rahro-panel`.
-
-**Windows Server** (PowerShell as Administrator, Go installed):
-
-```powershell
-irm https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.ps1 | iex
-```
-
-**Docker:**
-
-```bash
-git clone https://github.com/AwmiresGg/rahro-tunnel && cd rahro-tunnel
-docker compose up -d --build
-docker compose exec panel rahro-panel admin create -config /data/panel.json -u admin -p 'YOUR_PASS'
-```
+Open the panel at `https://<server-ip>:2053` (self-signed cert — accept the
+browser warning). Then log in.
 
 ---
 
-## 2. Add nodes (locations) and Iran tunnels
+## Your first working config (30 seconds)
 
-In the panel → **Nodes** → *Add location node* (or **Tunnel nodes** → *Add
-tunnel node*). You get a **connection code**. On that server, run:
+1. **Inbounds** tab → Protocol **VLESS**, Port **443**, network **tcp**,
+   security **reality**.
+2. Click **🔑 Generate REALITY keys** (fills the keys into Settings) → **Add inbound**.
+3. **Users** tab → **Add user** → click **sub** to copy the subscription link.
+4. Paste the link into v2rayNG / NekoBox / sing-box / Clash-Meta → **it connects**.
+
+The panel runs Xray with your inbounds and every active user as a client; the
+subscription returns real `vless://…reality` (and vmess/trojan/ss) links that
+stock clients understand. Any user/inbound change reloads Xray automatically.
+
+---
+
+## Terminal menu (`rahro`)
+
+Type `rahro` on the server for an `x-ui`-style menu:
+
+```
+ 1) Status & info      2/3/4) restart / start / stop
+ 5) Change admin username & password
+ 6) Change panel port
+ 7) SSL / access mode  (self-signed | http | domain + Let's Encrypt)
+ 8) Secret path        9) Public URL
+10) View logs         11) Update panel (re-download latest)
+12) Show login info   13) Uninstall
+```
+
+So SSL, port, and admin credentials can be changed from the terminal **or** the
+web **Settings** tab.
+
+### Getting a real certificate (domain)
+
+Point a DNS A record at the server, open ports 80 and 443, then `rahro` → option
+**7** → **domain** → enter it. Let's Encrypt is fetched automatically.
+
+---
+
+## Nodes & the Iran tunnel (multi-location + relay)
+
+Rahro also runs a fleet:
+
+- **Location nodes** — extra foreign servers that add locations to every
+  subscription.
+- **Tunnel nodes** — an **in-country (e.g. Iran) relay**: users connect to a
+  domestic IP (low latency, not blocked) and the node relays everything to a
+  foreign node over the **Rahro tunnel**, which looks like ordinary HTTPS. Only
+  the obfuscated flow crosses the border.
+
+In the panel → **Nodes** / **Tunnel nodes** → add one → copy its **connection
+code** → on that server run:
 
 ```bash
 I="https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/HEAD/scripts/install.sh"
-
-# Foreign egress location (adds a location to every subscription):
-curl -fsSL "$I" | sudo bash -s -- node <CONNECTION-CODE> -panel https://<panel-ip>:2053 -insecure
-
-# Iran relay (tunnels to the panel/upstream over the Rahro tunnel):
+# foreign egress location:
+curl -fsSL "$I" | sudo bash -s -- node   <CONNECTION-CODE> -panel https://<panel-ip>:2053 -insecure
+# Iran relay:
 curl -fsSL "$I" | sudo bash -s -- tunnel <CONNECTION-CODE> -panel https://<panel-ip>:2053 -insecure
 ```
 
-`-insecure` skips TLS verification of the panel (needed when the panel uses a
-self-signed cert / an IP). Drop it when the panel has a real domain cert.
-
-The node enrolls over its secret, pulls its config, and starts as a systemd
-service (`journalctl -u rahro-node -f`).
+Replace `<CONNECTION-CODE>` (no angle brackets) and the panel IP. `-insecure`
+skips verifying the panel's self-signed cert; drop it once the panel has a
+domain cert.
 
 ---
 
-## 3. Create users & share subscriptions
+## Telegram sales bot (API token)
 
-Panel → **Users** → *Add user* (set quota in GB and days). Each user gets **one
-subscription link that lists every enabled location**:
-
-```
-https://<panel>/sub/<token>
-```
-
-Paste it into v2rayNG / NekoBox / sing-box / Clash-Meta. Quotas and expiry are
-enforced centrally; "copy" in the Users table copies the link.
-
----
-
-## 4. Connect a Telegram sales bot (API token)
-
-Panel → **API tokens** → *Create token* (shown once). Your bot calls the panel
-with `Authorization: Bearer <token>`:
+Panel → **API tokens** → create one (shown once). Your bot calls the panel with
+`Authorization: Bearer <token>`:
 
 ```bash
-# Create a user for a sale (50 GB, 30 days) — returns the subscription link:
-curl -s https://<panel>/botapi/users \
-  -H "Authorization: Bearer rahro_xxx" \
+# create a user for a sale (50 GB, 30 days) — returns the subscription link:
+curl -s https://<panel>/botapi/users -H "Authorization: Bearer rahro_xxx" \
   -d '{"username":"buyer1","quota_gb":50,"days":30}'
-
-# Look up a user + usage:
-curl -s https://<panel>/botapi/users/<uuid> -H "Authorization: Bearer rahro_xxx"
-
-# Renew / top up (add days & GB, optionally reset usage):
-curl -s https://<panel>/botapi/users/<uuid>/renew \
-  -H "Authorization: Bearer rahro_xxx" \
-  -d '{"add_days":30,"add_gb":50,"reset_usage":true}'
-
-# List locations the sale covers:
-curl -s https://<panel>/botapi/nodes -H "Authorization: Bearer rahro_xxx"
+# look up usage:         GET  /botapi/users/<uuid>
+# renew / top up:        POST /botapi/users/<uuid>/renew  {"add_days":30,"add_gb":50,"reset_usage":true}
+# list locations:        GET  /botapi/nodes
 ```
 
-The create/renew responses include `sub_link`, so the bot can send it straight
-to the customer.
+Create/renew responses include `sub_link`, so the bot sends it straight to the buyer.
 
 ---
 
-## CLI
+## Configuration (`/etc/rahro/panel.json`)
 
-```bash
-rahro-panel run        -config /etc/rahro/panel.json   # run the panel (service does this)
-rahro-panel admin create -u admin -p 'pass'            # create / reset admin
-rahro-panel admin passwd -u admin -p 'newpass'
-rahro-panel token create -name telegram-bot            # mint an API token
-rahro-server -genkey                                   # generate an X25519 keypair
-rahro-node   enroll <code> -panel https://panel:2053   # enroll a node
-rahro-node   run                                       # run an enrolled node
+```jsonc
+{
+  "log_level": "info",
+  "panel": {
+    "enabled": true,
+    "listen": "0.0.0.0:2053",
+    "tls_mode": "self-signed",          // off | self-signed | domain
+    "domain": "panel.example.com",      // required when tls_mode = domain
+    "db_path": "/etc/rahro/rahro-panel.db",
+    "public_url": "https://1.2.3.4:2053",// used to build subscription links
+    "base_path": "/x7f3a9"              // optional secret URL prefix
+  }
+}
 ```
+
+Edit it (or use the `rahro` menu), then `systemctl restart rahro-panel`.
 
 ---
 
 ## Build from source
 
 ```bash
-git clone https://github.com/AwmiresGg/rahro-tunnel && cd rahro-tunnel
-make build      # all binaries into ./ (go build ./...)
-make test       # full test suite
-make race       # tests under the race detector
-make dist       # cross-compiled Linux (amd64/arm64) + Windows binaries into ./dist
+git clone https://github.com/AwmiresGg/rahro-tunnel.git && cd rahro-tunnel
+make build        # all binaries
+make test         # full test suite
+make race         # tests under the race detector
+make dist         # cross-compiled Linux (amd64/arm64) + Windows binaries
 ```
 
-Requires Go 1.26+. Everything is pure Go (CGO disabled), so it cross-compiles
-cleanly to Linux and Windows.
-
----
-
-## Configuration reference (`panel.json`)
-
-```jsonc
-{
-  "log_level": "info",                 // debug|info|warn|error
-  "panel": {
-    "enabled": true,
-    "listen": "0.0.0.0:2053",
-    "tls_mode": "self-signed",         // off | self-signed | domain
-    "domain": "panel.example.com",     // required when tls_mode = domain
-    "db_path": "/etc/rahro/rahro-panel.db",
-    "public_url": "https://1.2.3.4:2053", // used to build subscription links
-    "base_path": "/x7f3a9"             // optional secret path prefix
-  }
-}
-```
-
-See [docs/DEPLOY.md](docs/DEPLOY.md) for production deployment and
-[docs/SECURITY.md](docs/SECURITY.md) for the threat model and hardening.
+Requires Go 1.26+. Pure Go (CGO disabled); cross-compiles to Linux and Windows.
+**Windows Server:** `scripts/install.ps1` (run in an elevated PowerShell).
 
 ---
 
 ## Status
 
-**Implemented and tested** (all packages pass `go test`; concurrency-sensitive
-ones pass `-race`):
+Working and tested: Xray-core integration (managed binary, auto-download,
+config from inbounds+users, reload on change), inbounds (VLESS/VMess/Trojan/
+Shadowsocks over tcp/ws/grpc/http/quic with none/tls/reality), REALITY key
+generation, working client share links & subscriptions, user quotas/expiry,
+multi-location nodes, the Iran tunnel-relay data path, admin account change, the
+`rahro` terminal menu, the Telegram bot API, and the DPI-resistant Rahro
+transport (TLS with a browser uTLS fingerprint, REALITY-style probe → decoy
+fallback, frame padding, WebSocket transport). All packages pass `go test`;
+concurrency-sensitive ones pass `-race`.
 
-- Crypto core (X25519 / AEAD / HKDF / replay window / REALITY-style authenticator)
-- Rahro protocol + stream multiplexer with flow control
-- TLS transport with REALITY-style probe → decoy fallback, uTLS fingerprinting,
-  WebSocket transport, frame-length padding
-- Client inbounds (SOCKS5, HTTP/HTTPS proxy) + server egress, proven end-to-end
-- Panel: SQLite store, admin API, SPA, CLI, subscription endpoint
-- Node control plane + connection-code enrollment; Iran tunnel-relay data path
-  (user → tunnel node → Rahro tunnel → location egress → origin), proven e2e
-- Telegram bot API (token auth): create/renew users, usage, nodes
-
-**Roadmap / not yet implemented (honest limitations):**
-
-- **Stock-client standard inbounds (VLESS / Trojan / Shadowsocks).** Today a
-  tunnel node's user ingress is a **SOCKS5/HTTP proxy** relayed over the Rahro
-  tunnel, and the fully-native path is the Rahro protocol. Implementing the
-  VLESS/Trojan/SS wire protocols so unmodified v2rayNG/sing-box clients connect
-  directly is the next milestone; until then the `vless://` lines in a
-  subscription are placeholders for that integration, and the working user path
-  is the local SOCKS5/HTTP proxy (or a future Rahro client app).
-- **Full REALITY** (ClientHello key-share embedding + raw-TCP decoy forwarding
-  that preserves the decoy's real certificate) — see docs/SECURITY.md. Use
-  `tls_mode: domain` on user-facing nodes for a trusted cert in the meantime.
-- **gRPC / QUIC transports** — the transport layer is pluggable; TLS and
-  WebSocket ship now.
-- Client **GUI / mobile apps**.
-
-These are called out so nothing here is oversold: the tunnel, obfuscation,
-panel, nodes, enrollment, Iran relay path, and bot API are real and tested; the
-stock-client protocol front-ends are the remaining work.
+Roadmap: per-user Xray traffic stats → automatic quota enforcement; full
+REALITY ClientHello embedding for the Rahro transport; gRPC/QUIC Rahro
+transports; mobile/GUI client. See [docs/DESIGN.md](docs/DESIGN.md) and
+[docs/SECURITY.md](docs/SECURITY.md).
