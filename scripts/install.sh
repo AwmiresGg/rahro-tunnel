@@ -36,13 +36,20 @@ esac
 ensure_go(){
   if command -v go >/dev/null 2>&1; then GO=go; return; fi
   if [ -x /usr/local/go/bin/go ]; then GO=/usr/local/go/bin/go; export PATH="/usr/local/go/bin:$PATH"; return; fi
-  # Use the current stable Go so the download always exists on the CDN.
-  local gv; gv="$(curl -fsSL 'https://go.dev/VERSION?m=text' 2>/dev/null | head -n1)"
+  # Resolve the current stable Go version (fall back if go.dev is unreachable).
+  local gv; gv="$(curl -fsSL --max-time 15 'https://go.dev/VERSION?m=text' 2>/dev/null | head -n1)"
   case "$gv" in go*) ;; *) gv="$GO_FALLBACK";; esac
-  info "installing ${gv}"
   local tgz="${gv}.linux-${GOARCH}.tar.gz"
-  curl -fsSL "https://go.dev/dl/${tgz}" -o "/tmp/${tgz}" || die "download Go failed (${tgz}); retry, or install Go manually from https://go.dev/dl/ and re-run"
-  rm -rf /usr/local/go && tar -C /usr/local -xzf "/tmp/${tgz}" || die "extract Go failed"
+  info "installing ${gv}"
+  # Try multiple official mirrors — some networks reach one but not another.
+  local got=0 base
+  for base in "https://go.dev/dl" "https://dl.google.com/go" "https://golang.google.cn/dl"; do
+    if curl -fsSL --max-time 300 "$base/$tgz" -o "/tmp/$tgz" 2>/dev/null; then
+      got=1; info "fetched Go from $base"; break
+    fi
+  done
+  [ "$got" = 1 ] || die "could not download Go from any mirror. Install Go 1.26+ manually (https://go.dev/dl/) so 'go' is on PATH, then re-run this script."
+  rm -rf /usr/local/go && tar -C /usr/local -xzf "/tmp/$tgz" || die "extract Go failed"
   export PATH="/usr/local/go/bin:$PATH"
   GO=/usr/local/go/bin/go
   ok "Go installed (${gv})"
