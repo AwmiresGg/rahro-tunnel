@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/awmiresgg/rahro/core/version"
 	"github.com/awmiresgg/rahro/internal/config"
@@ -200,16 +201,73 @@ func menuLogs() {
 	runCmd("journalctl", "-u", "rahro-panel", "-n", "80", "--no-pager")
 }
 
+const updateRepo = "AwmiresGg/rahro-tunnel"
+const updateBranch = "vpn-tunnel-panel-RAHR0"
+
 func menuUpdate() {
 	arch := runtime.GOARCH
-	url := updateBaseURL + arch + "/rahro-panel"
-	fmt.Println("  downloading latest rahro-panel (" + arch + ") …")
-	if err := downloadTo(url, "/usr/local/bin/rahro-panel"); err != nil {
+	// raw.githubusercontent.com is edge-cached per region, so a plain HEAD URL
+	// can serve a stale binary long after a push. Resolve the latest commit SHA
+	// (immutable path -> never stale); fall back to HEAD with a cache-buster.
+	ref := "HEAD"
+	if sha, err := latestSHA(updateBranch); err == nil && len(sha) >= 7 {
+		ref = sha
+	}
+	url := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/bin/linux-%s/rahro-panel?t=%d",
+		updateRepo, ref, arch, time.Now().UnixNano())
+	fmt.Printf("  downloading latest rahro-panel (%s, ref %.12s) …\n", arch, ref)
+	dst := selfPath()
+	if err := downloadTo(url, dst); err != nil {
 		fmt.Println("  update failed:", err)
+		fmt.Println("  (if it says permission denied, run the menu with sudo: sudo rahro)")
 		return
 	}
-	fmt.Println("  ✓ binary updated; restarting")
+	// Report the version actually on disk now, so a cached/failed download is
+	// obvious instead of silent.
+	out, _ := exec.Command(dst, "version").Output()
+	fmt.Printf("  ✓ updated to: %s", out)
+	if v := strings.TrimSpace(string(out)); v != "" && !strings.Contains(v, version.Version) {
+		fmt.Println("  (new binary installed; restarting the service)")
+	}
+	fmt.Println("  restarting …")
 	svc("restart")
+}
+
+// latestSHA returns the newest commit SHA of a branch via the GitHub API. The
+// vnd.github.sha media type returns just the hex SHA, nothing else.
+func latestSHA(branch string) (string, error) {
+	req, err := http.NewRequest(http.MethodGet,
+		"https://api.github.com/repos/"+updateRepo+"/commits/"+branch, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/vnd.github.sha")
+	req.Header.Set("User-Agent", "rahro-updater")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 100))
+	sha := strings.TrimSpace(string(b))
+	for _, c := range sha {
+		if !strings.ContainsRune("0123456789abcdefABCDEF", c) {
+			return "", fmt.Errorf("unexpected sha %q", sha)
+		}
+	}
+	return sha, nil
+}
+
+// selfPath returns the path of the running rahro-panel binary (falls back to
+// the conventional install path).
+func selfPath() string {
+	if p, err := os.Executable(); err == nil && p != "" {
+		return p
+	}
+	return "/usr/local/bin/rahro-panel"
 }
 
 func menuLogin(p *config.PanelConfig) {
@@ -302,7 +360,13 @@ func runCmd(name string, args ...string) error {
 }
 
 func downloadTo(rawURL, dst string) error {
-	resp, err := http.Get(rawURL)
+	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Pragma", "no-cache")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}

@@ -87,9 +87,16 @@ build(){
 # This is the fast path and the only one that works where go.dev is blocked.
 try_prebuilt(){ # $1 = binary name
   local name="$1"
-  local url="https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/${REF}/bin/linux-${GOARCH}/${name}"
-  info "downloading prebuilt ${name} (linux-${GOARCH})"
-  if curl -fsSL --max-time 180 "$url" -o "$PREFIX/$name" 2>/dev/null && [ -s "$PREFIX/$name" ]; then
+  # Prefer an immutable commit-SHA path so GitHub's regional CDN can't serve a
+  # stale binary; fall back to the branch ref with a cache-busting query.
+  local ref="$REF"
+  local sha
+  sha="$(curl -fsSL -H 'Accept: application/vnd.github.sha' -H 'User-Agent: rahro' \
+    "https://api.github.com/repos/AwmiresGg/rahro-tunnel/commits/${REF}" 2>/dev/null)"
+  case "$sha" in *[!0-9a-fA-F]*|'') : ;; *) ref="$sha" ;; esac
+  local url="https://raw.githubusercontent.com/AwmiresGg/rahro-tunnel/${ref}/bin/linux-${GOARCH}/${name}?t=$(date +%s)"
+  info "downloading prebuilt ${name} (linux-${GOARCH}, ref ${ref:0:12})"
+  if curl -fsSL --max-time 180 -H 'Cache-Control: no-cache' "$url" -o "$PREFIX/$name" 2>/dev/null && [ -s "$PREFIX/$name" ]; then
     chmod +x "$PREFIX/$name"
     ok "installed prebuilt $PREFIX/$name"
     return 0
