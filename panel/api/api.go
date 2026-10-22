@@ -28,8 +28,10 @@ type Server struct {
 	// inbounds and users. nil disables Xray features gracefully.
 	Xray *xray.Manager
 
-	mu       sync.Mutex
-	sessions map[string]session // cookie token -> session
+	mu         sync.Mutex
+	sessions   map[string]session // cookie token -> session
+	lastActive map[int64]bool     // user IDs in the currently-applied Xray config
+	logins     map[string]*loginAttempts
 }
 
 type session struct {
@@ -45,7 +47,8 @@ func New(st *store.Store, log *slog.Logger, publicBase string) *Server {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	return &Server{Store: st, Log: log, PublicBase: publicBase, sessions: map[string]session{}}
+	return &Server{Store: st, Log: log, PublicBase: publicBase,
+		sessions: map[string]session{}, logins: map[string]*loginAttempts{}}
 }
 
 // Routes registers all API routes on a new mux and returns it.
@@ -58,6 +61,7 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/me", s.admin(s.handleMe))
 	mux.HandleFunc("POST /api/account", s.admin(s.handleChangeAccount))
 	mux.HandleFunc("GET /api/stats", s.admin(s.handleStats))
+	mux.HandleFunc("GET /api/backup", s.admin(s.handleBackup))
 
 	// Users.
 	mux.HandleFunc("GET /api/users", s.admin(s.handleListUsers))
@@ -100,6 +104,7 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("GET /botapi/users/{uuid}", s.botToken(s.handleBotGetUser))
 	mux.HandleFunc("POST /botapi/users/{uuid}/renew", s.botToken(s.handleBotRenewUser))
 	mux.HandleFunc("GET /botapi/nodes", s.botToken(s.handleBotNodes))
+	mux.HandleFunc("GET /botapi/backup", s.botToken(s.handleBackup))
 
 	return mux
 }
@@ -165,6 +170,12 @@ func bearer(r *http.Request) string {
 // --- handlers: auth ---
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	key := clientKey(r)
+	if locked, left := s.loginLocked(key); locked {
+		w.Header().Set("Retry-After", strconv.Itoa(int(left.Seconds())+1))
+		httpError(w, http.StatusTooManyRequests, "too many failed attempts; try again later")
+		return
+	}
 	var req struct{ Username, Password string }
 	if err := readJSON(r, &req); err != nil {
 		httpError(w, http.StatusBadRequest, "bad request")
@@ -172,9 +183,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	a, err := s.Store.GetAdmin(req.Username)
 	if err != nil || !auth.VerifyPassword(req.Password, a.PasswordHash) {
+		s.loginFailed(key)
 		httpError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
+	s.loginOK(key)
 	tok := s.newSession(a.Username)
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
@@ -281,6 +294,22 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		"users": len(users), "active_users": active,
 		"nodes": len(nodes), "nodes_enabled": online,
 	})
+}
+
+// handleBackup streams a consistent SQLite snapshot of the whole panel
+// database as a downloadable file. Served to both admins (cookie) and the bot
+// API (Bearer) so backups can be pulled to Telegram.
+func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
+	data, err := s.Store.Backup()
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, "backup failed")
+		return
+	}
+	name := "rahro-" + time.Now().UTC().Format("20060102-150405") + ".db"
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Write(data)
 }
 
 // --- helpers ---

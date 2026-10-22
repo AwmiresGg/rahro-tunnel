@@ -1,0 +1,51 @@
+Rahro — Proprietary Software License Agreement
+Copyright (c) 2026 AwmiresGg. All rights reserved.
+
+This software and its source code ("Rahro", the "Software") are the exclusive
+property of the copyright holder and are protected by copyright law and
+international treaties. The Software is licensed, not sold.
+
+1. Grant of use
+   Subject to this Agreement, you are granted a personal, non-exclusive,
+   non-transferable, revocable license to install and run the Software to
+   operate your own service.
+
+2. Restrictions
+   You may NOT, without the prior written permission of the copyright holder:
+   (a) copy, publish, or redistribute the Software or its source code;
+   (b) sell, sublicense, rent, lease, or otherwise make the Software available
+       to third parties as a competing product;
+   (c) modify, adapt, translate, reverse engineer, decompile, or create
+       derivative works from the source code for redistribution;
+   (d) remove or alter any copyright, trademark, or proprietary notices.
+
+   Running the Software to provide a service to your own users (including a
+   paid service) is permitted. Redistributing the Software itself is not.
+
+3. Third-party components
+   The Software uses third-party open-source components and runs Xray-core as a
+   separate, independently-licensed program downloaded at runtime. Those
+   components remain under their own licenses; see THIRD-PARTY-NOTICES.md. This
+   Agreement does not modify your rights under those licenses.
+
+4. No warranty
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+5. Limitation of liability
+   IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR
+   OTHER LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR
+   ITS USE.
+
+6. Lawful use
+   You are solely responsible for complying with all laws and regulations
+   applicable to your use of the Software in your jurisdiction. The Software is
+   provided for lawful privacy and anti-censorship purposes.
+
+7. Termination
+   This license terminates automatically if you breach any term. On
+   termination you must stop using and destroy all copies of the Software.
+
+For permissions beyond this license (redistribution, OEM, resale of the
+Software itself), contact the copyright holder.

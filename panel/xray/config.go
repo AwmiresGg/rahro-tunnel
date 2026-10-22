@@ -11,9 +11,14 @@ import (
 	"github.com/awmiresgg/rahro/panel/store"
 )
 
+// APIPort is the localhost-only port on which Xray exposes its gRPC stats/API
+// service, used by the panel to read per-user traffic counters.
+const APIPort = 62789
+
 // GenerateConfig builds an Xray config object from the enabled inbounds and the
 // active users (offered as clients on every inbound). The result marshals to a
-// valid Xray config.json.
+// valid Xray config.json. It enables per-user traffic statistics so the panel
+// can meter usage and enforce quotas.
 func GenerateConfig(inbounds []*store.Inbound, users []*store.User) map[string]any {
 	var active []*store.User
 	for _, u := range users {
@@ -22,7 +27,15 @@ func GenerateConfig(inbounds []*store.Inbound, users []*store.User) map[string]a
 		}
 	}
 
-	ins := []map[string]any{}
+	// A localhost dokodemo-door inbound tagged "api" lets the panel reach the
+	// StatsService to read (and reset) per-user traffic counters.
+	ins := []map[string]any{{
+		"tag":      "api",
+		"listen":   "127.0.0.1",
+		"port":     APIPort,
+		"protocol": "dokodemo-door",
+		"settings": map[string]any{"address": "127.0.0.1"},
+	}}
 	for _, in := range inbounds {
 		if !in.Enabled {
 			continue
@@ -31,11 +44,26 @@ func GenerateConfig(inbounds []*store.Inbound, users []*store.User) map[string]a
 	}
 
 	return map[string]any{
-		"log":      map[string]any{"loglevel": "warning"},
+		"log":   map[string]any{"loglevel": "warning"},
+		"api":   map[string]any{"tag": "api", "services": []string{"StatsService"}},
+		"stats": map[string]any{},
+		"policy": map[string]any{
+			"levels": map[string]any{
+				"0": map[string]any{"statsUserUplink": true, "statsUserDownlink": true},
+			},
+			"system": map[string]any{
+				"statsInboundUplink": true, "statsInboundDownlink": true,
+			},
+		},
 		"inbounds": ins,
 		"outbounds": []map[string]any{
 			{"protocol": "freedom", "tag": "direct"},
 			{"protocol": "blackhole", "tag": "blocked"},
+		},
+		"routing": map[string]any{
+			"rules": []map[string]any{
+				{"type": "field", "inboundTag": []string{"api"}, "outboundTag": "api"},
+			},
 		},
 	}
 }

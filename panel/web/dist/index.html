@@ -115,7 +115,8 @@ function show(v){
   $('#title').textContent={dash:'Dashboard',users:'Users',inbounds:'Inbounds',nodes:'Nodes & tunnels',tokens:'API tokens',settings:'Settings'}[v];
   ({dash:renderDash,users:renderUsers,inbounds:renderInbounds,nodes:renderNodes,tokens:renderTokens,settings:renderSettings}[v])();
 }
-const gb=n=>n?(n/1073741824).toFixed(0)+' GB':'∞';
+const gb=n=>{if(!n)return '∞';const g=n/1073741824;if(g>=10)return g.toFixed(0)+' GB';if(g>=0.1)return g.toFixed(1)+' GB';const m=n/1048576;return (m>=1?m.toFixed(0)+' MB':(n/1024).toFixed(0)+' KB')};
+const used=n=>{const g=n/1073741824;if(g>=1)return g.toFixed(2)+' GB';const m=n/1048576;return m>=1?m.toFixed(1)+' MB':(n/1024).toFixed(0)+' KB'};
 const when=t=>t?new Date(t*1000).toISOString().slice(0,10):'—';
 
 async function renderDash(){
@@ -143,7 +144,7 @@ async function renderUsers(){
   const u=await api('GET','/api/users');
   let rows=u.map(x=>`<tr>
     <td><b>${esc(x.username)}</b><div class="mono">${x.uuid.slice(0,12)}…</div></td>
-    <td>${gb(x.used_bytes)} / ${gb(x.quota_bytes)}</td>
+    <td>${used(x.used_bytes)} / ${gb(x.quota_bytes)}</td>
     <td>${when(x.expires_at)}</td>
     <td>${x.active?'<span class="badge b-ok">active</span>':'<span class="badge b-bad">inactive</span>'}</td>
     <td><button class="btn-ghost" onclick="copySub('${x.sub_token}')">sub</button>
@@ -259,7 +260,21 @@ function renderSettings(){
       <label>New password (optional, min 6)</label><input id="nps" class="in" type="password" placeholder="leave blank to keep" style="margin-bottom:16px">
       <button class="btn" onclick="changeAccount()">Save changes</button>
       <div id="serr" style="font-size:12px;margin-top:10px"></div>
+    </div>
+    <div class="card" style="max-width:520px;margin-top:14px">
+      <div style="font-size:14px;font-weight:600;margin-bottom:4px">Backup &amp; data</div>
+      <div style="color:var(--dim);font-size:12px;margin-bottom:14px">Download a complete snapshot of the panel database (users, inbounds, nodes, tokens). Keep it somewhere safe; to restore, replace the panel's .db file with it.</div>
+      <button class="btn" onclick="downloadBackup()">⬇ Download backup</button>
     </div>`;
+}
+async function downloadBackup(){
+  try{
+    const r=await fetch('/api/backup',{credentials:'same-origin'});
+    if(!r.ok) throw new Error('backup failed');
+    const b=await r.blob(), u=URL.createObjectURL(b), a=document.createElement('a');
+    const cd=r.headers.get('Content-Disposition')||'', m=cd.match(/filename="([^"]+)"/);
+    a.href=u; a.download=m?m[1]:'rahro-backup.db'; a.click(); URL.revokeObjectURL(u);
+  }catch(e){toast('Backup failed')}
 }
 async function changeAccount(){
   const body={current_password:$('#cp').value,new_username:$('#nus').value,new_password:$('#nps').value};

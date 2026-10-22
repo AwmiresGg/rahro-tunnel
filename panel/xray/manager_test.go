@@ -53,4 +53,12 @@ func TestManagerIntegration(t *testing.T) {
 		t.Fatalf("port 10800 not listening: %v; log:\n%s", err, b)
 	}
 	conn.Close()
+
+	// The stats API inbound must be reachable and the StatsService must answer.
+	// With no traffic yet the result is empty, but a successful call proves the
+	// metering path (api inbound + routing + `xray api statsquery`) works.
+	if _, err := m.QueryTraffic(false); err != nil {
+		b, _ := os.ReadFile(dir + "/xray.log")
+		t.Fatalf("QueryTraffic: %v; log:\n%s", err, b)
+	}
 }

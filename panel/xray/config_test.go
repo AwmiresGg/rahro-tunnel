@@ -7,6 +7,19 @@ import (
 	"github.com/awmiresgg/rahro/panel/store"
 )
 
+// userInbounds returns the generated inbounds excluding the internal "api"
+// stats inbound that GenerateConfig always prepends.
+func userInbounds(cfg map[string]any) []map[string]any {
+	var out []map[string]any
+	for _, in := range cfg["inbounds"].([]map[string]any) {
+		if in["tag"] == "api" {
+			continue
+		}
+		out = append(out, in)
+	}
+	return out
+}
+
 func TestGenerateConfigVLESSReality(t *testing.T) {
 	inbounds := []*store.Inbound{
 		{
@@ -33,7 +46,7 @@ func TestGenerateConfigVLESSReality(t *testing.T) {
 		t.Fatalf("not valid JSON: %v", err)
 	}
 
-	ins := cfg["inbounds"].([]map[string]any)
+	ins := userInbounds(cfg)
 	if len(ins) != 1 {
 		t.Fatalf("want 1 enabled inbound, got %d", len(ins))
 	}
@@ -71,7 +84,7 @@ func TestGenerateConfigTrojanWSTLS(t *testing.T) {
 	users := []*store.User{{Username: "u", UUID: "pw-uuid", Enabled: true}}
 
 	cfg := GenerateConfig(inbounds, users)
-	ib := cfg["inbounds"].([]map[string]any)[0]
+	ib := userInbounds(cfg)[0]
 	clients := ib["settings"].(map[string]any)["clients"].([]map[string]any)
 	if clients[0]["password"] != "pw-uuid" {
 		t.Fatalf("trojan client should use password: %+v", clients[0])
@@ -89,7 +102,7 @@ func TestGenerateConfigShadowsocksDefaults(t *testing.T) {
 	inbounds := []*store.Inbound{{Tag: "ss", Protocol: store.ProtoShadowsocks, Port: 8388, Enabled: true}}
 	users := []*store.User{{Username: "u", UUID: "pw", Enabled: true}}
 	cfg := GenerateConfig(inbounds, users)
-	settings := cfg["inbounds"].([]map[string]any)[0]["settings"].(map[string]any)
+	settings := userInbounds(cfg)[0]["settings"].(map[string]any)
 	c := settings["clients"].([]map[string]any)[0]
 	if c["method"] != "chacha20-ietf-poly1305" {
 		t.Fatalf("default ss method wrong: %v", c["method"])
@@ -101,10 +114,41 @@ func TestGenerateConfigShadowsocksDefaults(t *testing.T) {
 
 func TestGenerateConfigNoUsers(t *testing.T) {
 	cfg := GenerateConfig(nil, nil)
-	if len(cfg["inbounds"].([]map[string]any)) != 0 {
-		t.Fatal("no inbounds expected")
+	if len(userInbounds(cfg)) != 0 {
+		t.Fatal("no user inbounds expected")
 	}
 	if _, err := Marshal(cfg); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestGenerateConfigStatsAPI verifies the stats/api scaffolding needed for
+// per-user traffic metering is present and wired by routing.
+func TestGenerateConfigStatsAPI(t *testing.T) {
+	cfg := GenerateConfig(nil, nil)
+	if _, ok := cfg["stats"]; !ok {
+		t.Fatal("stats object missing")
+	}
+	apiObj, ok := cfg["api"].(map[string]any)
+	if !ok || apiObj["tag"] != "api" {
+		t.Fatalf("api object missing/wrong: %+v", cfg["api"])
+	}
+	// The api dokodemo-door inbound must exist on localhost:APIPort.
+	var found bool
+	for _, in := range cfg["inbounds"].([]map[string]any) {
+		if in["tag"] == "api" {
+			found = true
+			if in["listen"] != "127.0.0.1" || in["port"].(int) != APIPort {
+				t.Fatalf("api inbound bound wrong: %+v", in)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("api inbound missing")
+	}
+	// Routing must send the api inbound to the api outbound tag.
+	rules := cfg["routing"].(map[string]any)["rules"].([]map[string]any)
+	if len(rules) == 0 || rules[0]["outboundTag"] != "api" {
+		t.Fatalf("api routing rule missing: %+v", rules)
 	}
 }

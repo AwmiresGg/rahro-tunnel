@@ -2,6 +2,7 @@ package xray
 
 import (
 	"archive/zip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,6 +11,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -215,6 +218,50 @@ func (m *Manager) Version() (string, error) {
 		return "", err
 	}
 	return firstLine(string(out)), nil
+}
+
+// QueryTraffic reads per-user traffic counters from Xray's StatsService via the
+// bundled `xray api` CLI (no gRPC dependency). It returns total bytes
+// (uplink+downlink) keyed by user email. When reset is true the counters are
+// zeroed, so each poll yields the delta since the previous one.
+func (m *Manager) QueryTraffic(reset bool) (map[string]int64, error) {
+	if !m.Installed() {
+		return nil, fmt.Errorf("xray not installed")
+	}
+	args := []string{"api", "statsquery", "--server=127.0.0.1:" + strconv.Itoa(APIPort), "-pattern", "user>>>"}
+	if reset {
+		args = append(args, "-reset")
+	}
+	out, err := exec.Command(m.binPath(), args...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("xray statsquery: %w", err)
+	}
+	return parseTrafficStats(out), nil
+}
+
+// parseTrafficStats parses the JSON emitted by `xray api statsquery` into a
+// map of user email -> total bytes. Stat names look like
+// "user>>>alice>>>traffic>>>uplink"; uplink and downlink are summed.
+func parseTrafficStats(b []byte) map[string]int64 {
+	var parsed struct {
+		Stat []struct {
+			Name  string `json:"name"`
+			Value string `json:"value"`
+		} `json:"stat"`
+	}
+	res := map[string]int64{}
+	if err := json.Unmarshal(b, &parsed); err != nil {
+		return res
+	}
+	for _, s := range parsed.Stat {
+		parts := strings.Split(s.Name, ">>>")
+		if len(parts) != 4 || parts[0] != "user" || parts[2] != "traffic" {
+			continue
+		}
+		v, _ := strconv.ParseInt(s.Value, 10, 64)
+		res[parts[1]] += v
+	}
+	return res
 }
 
 func firstLine(s string) string {

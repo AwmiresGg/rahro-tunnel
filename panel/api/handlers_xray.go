@@ -33,6 +33,11 @@ func (s *Server) ApplyXray() {
 	inbounds, _ := s.Store.ListInbounds()
 	users, _ := s.Store.ListUsers()
 
+	// Record which users are in the config we're about to apply, so the traffic
+	// loop can tell when membership changes (a quota/expiry transition) and
+	// needs to reapply to drop a now-inactive user.
+	s.setLastActive(activeSet(users))
+
 	enabled := false
 	for _, in := range inbounds {
 		if in.Enabled {

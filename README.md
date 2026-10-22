@@ -118,9 +118,13 @@ curl -s https://<panel>/botapi/users -H "Authorization: Bearer rahro_xxx" \
 # look up usage:         GET  /botapi/users/<uuid>
 # renew / top up:        POST /botapi/users/<uuid>/renew  {"add_days":30,"add_gb":50,"reset_usage":true}
 # list locations:        GET  /botapi/nodes
+# download a backup:     GET  /botapi/backup        (a .db snapshot, e.g. to archive in Telegram)
 ```
 
-Create/renew responses include `sub_link`, so the bot sends it straight to the buyer.
+Create/renew responses include `sub_link`, so the bot sends it straight to the
+buyer. Usage returned by `GET /botapi/users/<uuid>` is **real metered traffic**:
+the panel reads per-user counters from Xray every ~45s and automatically
+disables a user the moment they hit their quota or expiry.
 
 ---
 
@@ -165,14 +169,26 @@ Requires Go 1.26+. Pure Go (CGO disabled); cross-compiles to Linux and Windows.
 Working and tested: Xray-core integration (managed binary, auto-download,
 config from inbounds+users, reload on change), inbounds (VLESS/VMess/Trojan/
 Shadowsocks over tcp/ws/grpc/http/quic with none/tls/reality), REALITY key
-generation, working client share links & subscriptions, user quotas/expiry,
-multi-location nodes, the Iran tunnel-relay data path, admin account change, the
+generation, working client share links & subscriptions, **real per-user traffic
+metering via Xray's stats API with automatic quota/expiry enforcement**,
+multi-location nodes, the Iran tunnel-relay data path, admin account change,
+**admin login brute-force lockout** and security headers (HSTS under TLS),
+**one-click database backup** (panel Settings tab or `GET /botapi/backup`), the
 `rahro` terminal menu, the Telegram bot API, and the DPI-resistant Rahro
 transport (TLS with a browser uTLS fingerprint, REALITY-style probe → decoy
-fallback, frame padding, WebSocket transport). All packages pass `go test`;
-concurrency-sensitive ones pass `-race`.
+fallback, frame padding, WebSocket transport). Verified end-to-end against the
+real Xray-core binary. All packages pass `go test`; concurrency-sensitive ones
+pass `-race`.
 
-Roadmap: per-user Xray traffic stats → automatic quota enforcement; full
-REALITY ClientHello embedding for the Rahro transport; gRPC/QUIC Rahro
-transports; mobile/GUI client. See [docs/DESIGN.md](docs/DESIGN.md) and
-[docs/SECURITY.md](docs/SECURITY.md).
+Roadmap: full REALITY ClientHello embedding for the Rahro transport; gRPC/QUIC
+Rahro transports; two-factor admin login (TOTP; the schema is ready); mobile/GUI
+client. See [docs/DESIGN.md](docs/DESIGN.md) and [docs/SECURITY.md](docs/SECURITY.md).
+
+---
+
+## License
+
+Rahro is **proprietary** software — Copyright © 2026 AwmiresGg, all rights
+reserved. You may run it to operate your own (including paid) service;
+redistributing the Software itself is not permitted. See [LICENSE](LICENSE) and
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

@@ -4,6 +4,7 @@
 package panel
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"log/slog"
@@ -48,6 +49,8 @@ func Run(st *store.Store, cfg *config.PanelConfig, log *slog.Logger) error {
 		}
 		apiSrv.ApplyXray()
 	}()
+	// Meter per-user traffic and enforce quotas/expiry in the background.
+	go apiSrv.RunTrafficLoop(context.Background(), 45*time.Second)
 
 	apiMux := apiSrv.Routes()
 
@@ -109,6 +112,9 @@ func secureHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Frame-Options", "DENY")
+		if r.TLS != nil {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
 		next.ServeHTTP(w, r)
 	})
 }
