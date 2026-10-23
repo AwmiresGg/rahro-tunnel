@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/awmiresgg/rahro/panel/xray"
 )
@@ -71,9 +72,23 @@ func (s *Server) handleXrayLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	access := r.URL.Query().Get("access") == "1"
-	writeJSON(w, http.StatusOK, map[string]string{
-		"log": s.Xray.TailLog(access, 60),
-	})
+	out := s.Xray.TailLog(access, 200)
+	if access {
+		// Drop the internal stats-API polls so only real client connections show.
+		var kept []string
+		for _, ln := range strings.Split(out, "\n") {
+			if strings.Contains(ln, "[api ") || strings.Contains(ln, ">>> api") ||
+				strings.Contains(ln, ":62789") || strings.Contains(ln, "inbound>>>api") {
+				continue
+			}
+			kept = append(kept, ln)
+		}
+		out = strings.TrimSpace(strings.Join(kept, "\n"))
+		if out == "" {
+			out = "(no real client connections yet — only internal stats polls, which are hidden)"
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"log": out})
 }
 
 func (s *Server) handleXrayStatus(w http.ResponseWriter, r *http.Request) {
