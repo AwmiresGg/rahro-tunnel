@@ -59,7 +59,16 @@ func (s *Server) ApplyXrayErr() error {
 		s.Log.Warn("xray binary not installed yet; skipping apply")
 		return nil
 	}
-	return s.Xray.Apply(xray.GenerateConfig(inbounds, users))
+	cfg := xray.GenerateConfig(inbounds, users)
+	// Optional debug logging: when enabled, Xray logs every incoming connection
+	// (even failed/probe), which tells us whether a client's packets reach the
+	// server at all vs. being blocked upstream.
+	if lvl, ok, _ := s.Store.GetSetting("xray_loglevel"); ok && lvl != "" {
+		if lg, ok := cfg["log"].(map[string]any); ok {
+			lg["loglevel"] = lvl
+		}
+	}
+	return s.Xray.Apply(cfg)
 }
 
 // handleXrayLog returns the tail of Xray's runtime log (or access log with
@@ -89,6 +98,22 @@ func (s *Server) handleXrayLog(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"log": out})
+}
+
+// handleXrayDebug toggles verbose Xray logging (loglevel debug) and reapplies,
+// so the admin can see whether a client's connection reaches the server.
+func (s *Server) handleXrayDebug(w http.ResponseWriter, r *http.Request) {
+	cur, _, _ := s.Store.GetSetting("xray_loglevel")
+	next := "debug"
+	if cur == "debug" {
+		next = "warning"
+	}
+	if err := s.Store.SetSetting("xray_loglevel", next); err != nil {
+		httpError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.ApplyXray()
+	writeJSON(w, http.StatusOK, map[string]string{"loglevel": next})
 }
 
 func (s *Server) handleXrayStatus(w http.ResponseWriter, r *http.Request) {

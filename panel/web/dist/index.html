@@ -160,6 +160,7 @@ async function renderDash(){
     <div style="font-weight:600">Xray core</div> ${xstate}
     <button class="btn-ghost" onclick="runDiag()">🩺 Diagnose connection</button>
     <button class="btn-ghost" onclick="showXrayLog()">📜 Xray log</button>
+    <button class="btn-ghost" onclick="toggleDebug()">🐞 Debug log</button>
     <button class="btn-ghost" style="margin-left:auto" onclick="xrayApply()">Apply / restart</button>
   </div>${xver?('<div class="card">'+xver+'</div>'):''}
   <div id="diag"></div>
@@ -167,6 +168,11 @@ async function renderDash(){
   <div class="card">Manage users, inbounds (served by Xray), nodes/tunnels, and API tokens from the sidebar. Changes to inbounds or users apply to Xray automatically.</div>`;
 }
 async function xrayApply(){try{const r=await api('POST','/api/xray/apply');toast(r.error?('Apply error: '+r.error):'Xray reloaded');renderDash()}catch(e){toast(e.message)}}
+async function toggleDebug(){
+  try{const r=await api('POST','/api/xray/debug');
+    toast(r.loglevel==='debug'?'Debug logging ON — connect from your phone, then open Xray log. Turn OFF when done.':'Debug logging OFF (back to normal).');
+  }catch(e){toast(e.message)}
+}
 async function showXrayLog(){
   let e=null,a=null;
   try{e=await api('GET','/api/xray/log')}catch(x){}
